@@ -504,9 +504,9 @@
         ];
 
         // Lane positioning constants
-        const SIDE_BY_SIDE_THRESHOLD = 2.5; // meters - if within this distance, considered "side by side"
-        const DRIFT_LEFT_SPEED = 0.8; // lanes per second - how fast runners drift toward lane 1
-        const PUSH_RIGHT_SPEED = 2.0; // lanes per second - how fast runners get pushed out
+        const SIDE_BY_SIDE_THRESHOLD = 1.5; // meters - if within this distance, considered "side by side"
+        const DRIFT_LEFT_SPEED = 3.0; // lanes per second - how fast runners drift toward lane 1
+        const PUSH_RIGHT_SPEED = 4.0; // lanes per second - how fast runners get pushed out
         const MIN_LANE_POSITION = 0.6; // left edge of lane 1 (inside the lane)
         const MAX_LANE_POSITION = 2.5; // can be pushed into lane 2 area
         const RUNNER_WIDTH = 0.5; // approximate width of a runner in meters
@@ -834,6 +834,7 @@
 
                 // Check if any other runner is to our left and side-by-side
                 let blockedOnLeft = false;
+                let minSafeLanePosition = MIN_LANE_POSITION;
 
                 for (const otherRunner of aiRunners) {
                     if (otherRunner === runner) continue;
@@ -842,22 +843,25 @@
                     const distanceDiff = Math.abs(runner.distance - otherRunner.distance);
                     if (distanceDiff > SIDE_BY_SIDE_THRESHOLD) continue;
 
-                    // Check if they're to our left (lower lane position)
-                    const laneDiff = runner.lanePosition - otherRunner.lanePosition;
-                    if (laneDiff > 0 && laneDiff < 1.2) {
-                        // Someone is to our left and close - we're blocked
-                        blockedOnLeft = true;
-
-                        // Push right to avoid collision
-                        const pushAmount = PUSH_RIGHT_SPEED * delta;
-                        runner.lanePosition = Math.min(runner.lanePosition + pushAmount, MAX_LANE_POSITION);
+                    // If the other runner is to our left or at same position, we need to stay right of them
+                    if (otherRunner.lanePosition <= runner.lanePosition + 0.3) {
+                        // Calculate minimum safe lane position (need to be at least 0.7 lanes right of them)
+                        const requiredPosition = otherRunner.lanePosition + 0.7;
+                        if (requiredPosition > minSafeLanePosition) {
+                            minSafeLanePosition = requiredPosition;
+                            blockedOnLeft = true;
+                        }
                     }
                 }
 
-                // If not blocked on left, drift toward lane 1
-                if (!blockedOnLeft && runner.lanePosition > MIN_LANE_POSITION) {
+                // If blocked, push right to safe position; otherwise drift toward lane 1
+                if (blockedOnLeft && runner.lanePosition < minSafeLanePosition) {
+                    const pushAmount = PUSH_RIGHT_SPEED * delta;
+                    runner.lanePosition = Math.min(runner.lanePosition + pushAmount, MAX_LANE_POSITION);
+                } else if (runner.lanePosition > minSafeLanePosition) {
+                    // Drift left toward the minimum safe position (or lane 1 if not blocked)
                     const driftAmount = DRIFT_LEFT_SPEED * delta;
-                    runner.lanePosition = Math.max(runner.lanePosition - driftAmount, MIN_LANE_POSITION);
+                    runner.lanePosition = Math.max(runner.lanePosition - driftAmount, minSafeLanePosition);
                 }
 
                 // Get new position on track using dynamic lane position
