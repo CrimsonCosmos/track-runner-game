@@ -832,36 +832,32 @@
                 // LANE JOCKEYING LOGIC
                 // ============================================
 
-                // Check if any other runner is to our left and side-by-side
-                let blockedOnLeft = false;
-                let minSafeLanePosition = MIN_LANE_POSITION;
+                // Find all runners that are "side by side" with this runner (within threshold)
+                const nearbyRunners = aiRunners.filter(other => {
+                    if (other === runner) return true; // Include self
+                    const distanceDiff = Math.abs(runner.distance - other.distance);
+                    return distanceDiff <= SIDE_BY_SIDE_THRESHOLD;
+                });
 
-                for (const otherRunner of aiRunners) {
-                    if (otherRunner === runner) continue;
+                // Sort nearby runners by distance (leader first)
+                nearbyRunners.sort((a, b) => b.distance - a.distance);
 
-                    // Check if they're close in distance (side by side)
-                    const distanceDiff = Math.abs(runner.distance - otherRunner.distance);
-                    if (distanceDiff > SIDE_BY_SIDE_THRESHOLD) continue;
+                // Find this runner's rank in the pack (0 = leader, 1 = second, etc.)
+                const rankInPack = nearbyRunners.indexOf(runner);
 
-                    // If the other runner is to our left or at same position, we need to stay right of them
-                    if (otherRunner.lanePosition <= runner.lanePosition + 0.3) {
-                        // Calculate minimum safe lane position (need to be at least 0.7 lanes right of them)
-                        const requiredPosition = otherRunner.lanePosition + 0.7;
-                        if (requiredPosition > minSafeLanePosition) {
-                            minSafeLanePosition = requiredPosition;
-                            blockedOnLeft = true;
-                        }
-                    }
-                }
+                // Target lane position based on rank (leader gets lane 1, others spread out)
+                const RUNNER_SPACING = 0.8; // lanes between runners when side-by-side
+                const targetLanePosition = MIN_LANE_POSITION + (rankInPack * RUNNER_SPACING);
 
-                // If blocked, push right to safe position; otherwise drift toward lane 1
-                if (blockedOnLeft && runner.lanePosition < minSafeLanePosition) {
+                // Smoothly move toward target position
+                if (runner.lanePosition < targetLanePosition - 0.05) {
+                    // Need to move right
                     const pushAmount = PUSH_RIGHT_SPEED * delta;
-                    runner.lanePosition = Math.min(runner.lanePosition + pushAmount, MAX_LANE_POSITION);
-                } else if (runner.lanePosition > minSafeLanePosition) {
-                    // Drift left toward the minimum safe position (or lane 1 if not blocked)
+                    runner.lanePosition = Math.min(runner.lanePosition + pushAmount, targetLanePosition, MAX_LANE_POSITION);
+                } else if (runner.lanePosition > targetLanePosition + 0.05) {
+                    // Can drift left
                     const driftAmount = DRIFT_LEFT_SPEED * delta;
-                    runner.lanePosition = Math.max(runner.lanePosition - driftAmount, minSafeLanePosition);
+                    runner.lanePosition = Math.max(runner.lanePosition - driftAmount, targetLanePosition, MIN_LANE_POSITION);
                 }
 
                 // Get new position on track using dynamic lane position
