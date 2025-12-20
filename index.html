@@ -832,32 +832,41 @@
                 // LANE JOCKEYING LOGIC
                 // ============================================
 
-                // Find all runners that are "side by side" with this runner (within threshold)
-                const nearbyRunners = aiRunners.filter(other => {
-                    if (other === runner) return true; // Include self
-                    const distanceDiff = Math.abs(runner.distance - other.distance);
-                    return distanceDiff <= SIDE_BY_SIDE_THRESHOLD;
-                });
-
-                // Sort nearby runners by distance (leader first)
-                nearbyRunners.sort((a, b) => b.distance - a.distance);
-
-                // Find this runner's rank in the pack (0 = leader, 1 = second, etc.)
-                const rankInPack = nearbyRunners.indexOf(runner);
-
-                // Target lane position based on rank (leader gets lane 1, others spread out)
+                // Only runners AHEAD of us (or slightly behind) can block us from lane 1
+                // If someone is more than 0.5m behind us, they don't block us
+                const BLOCKING_BEHIND_THRESHOLD = 0.5; // Can only block if at most this far behind
                 const RUNNER_SPACING = 0.8; // lanes between runners when side-by-side
-                const targetLanePosition = MIN_LANE_POSITION + (rankInPack * RUNNER_SPACING);
+
+                // Count how many runners are blocking us (ahead or barely behind, and to our left)
+                let blockingCount = 0;
+
+                for (const other of aiRunners) {
+                    if (other === runner) continue;
+
+                    // How far ahead is the other runner? (positive = they're ahead)
+                    const distanceAhead = other.distance - runner.distance;
+
+                    // They can block us if they're ahead, or only slightly behind
+                    if (distanceAhead >= -BLOCKING_BEHIND_THRESHOLD && distanceAhead <= SIDE_BY_SIDE_THRESHOLD) {
+                        // They're in blocking range - count them if they're toward the inside
+                        if (other.lanePosition < runner.lanePosition + RUNNER_SPACING) {
+                            blockingCount++;
+                        }
+                    }
+                }
+
+                // Target lane position: lane 1 plus offset for each blocker
+                const targetLanePosition = Math.min(MIN_LANE_POSITION + (blockingCount * RUNNER_SPACING), MAX_LANE_POSITION);
 
                 // Smoothly move toward target position
                 if (runner.lanePosition < targetLanePosition - 0.05) {
-                    // Need to move right
+                    // Need to move right (being blocked)
                     const pushAmount = PUSH_RIGHT_SPEED * delta;
-                    runner.lanePosition = Math.min(runner.lanePosition + pushAmount, targetLanePosition, MAX_LANE_POSITION);
+                    runner.lanePosition = Math.min(runner.lanePosition + pushAmount, MAX_LANE_POSITION);
                 } else if (runner.lanePosition > targetLanePosition + 0.05) {
-                    // Can drift left
+                    // Can drift left toward lane 1
                     const driftAmount = DRIFT_LEFT_SPEED * delta;
-                    runner.lanePosition = Math.max(runner.lanePosition - driftAmount, targetLanePosition, MIN_LANE_POSITION);
+                    runner.lanePosition = Math.max(runner.lanePosition - driftAmount, MIN_LANE_POSITION);
                 }
 
                 // Get new position on track using dynamic lane position
