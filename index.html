@@ -39,17 +39,61 @@
             font-size: 24px;
             z-index: 200;
         }
+        #startButton {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 15px 30px;
+            font-size: 18px;
+            font-weight: bold;
+            font-family: 'Arial', sans-serif;
+            background: #22cc22;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 100;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: background 0.2s, transform 0.1s;
+        }
+        #startButton:hover {
+            background: #1ea01e;
+            transform: scale(1.05);
+        }
+        #startButton:active {
+            transform: scale(0.95);
+        }
+        #startButton:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+        #raceInfo {
+            position: absolute;
+            top: 70px;
+            right: 20px;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 15px;
+            border-radius: 8px;
+            z-index: 100;
+            display: none;
+        }
     </style>
 </head>
 <body>
     <div id="info">
-        <strong>400m Track Runner</strong><br><br>
+        <strong>5K Track Race</strong><br><br>
         WASD - Move<br>
         Mouse - Look around<br>
         Shift - Sprint<br>
-        Click to start
+        Click to enable controls
     </div>
-    <div id="loading">Loading character...</div>
+    <div id="loading">Loading runners...</div>
+    <button id="startButton">START RACE</button>
+    <div id="raceInfo"></div>
 
     <script type="importmap">
     {
@@ -370,8 +414,83 @@
         // AI RUNNERS SYSTEM
         // ============================================
 
-        const AI_SPEED = 400 / 60; // 400 meters per minute = 6.67 m/s
-        const aiRunners = []; // Will hold { model, mixer, action, lane, distance }
+        const RACE_DISTANCE = 5000; // 5K race = 5000 meters
+        const aiRunners = []; // Will hold runner data
+        let raceStarted = false;
+        let raceTime = 0;
+
+        // Budapest 2023 World Championships 5000m Final - Top 7 splits
+        // Each runner has 1000m split times (cumulative) and final time
+        // Speeds calculated for each 1000m segment
+        const raceData = [
+            { // Ingebrigtsen - 13:11.30
+                name: "Ingebrigtsen",
+                splits: [157, 315, 472, 650, 791.3], // cumulative seconds at each 1000m
+                finalTime: 791.3
+            },
+            { // Katir - 13:11.44
+                name: "Katir",
+                splits: [156, 313, 471, 650, 791.44],
+                finalTime: 791.44
+            },
+            { // Krop - 13:12.28
+                name: "Krop",
+                splits: [156, 314, 472, 650, 792.28],
+                finalTime: 792.28
+            },
+            { // Grijalva - 13:12.50
+                name: "Grijalva",
+                splits: [156, 314, 471, 648, 792.50],
+                finalTime: 792.50
+            },
+            { // Kejelcha - 13:12.51
+                name: "Kejelcha",
+                splits: [156, 314, 472, 650, 792.51],
+                finalTime: 792.51
+            },
+            { // Gebrhiwet - 13:12.65
+                name: "Gebrhiwet",
+                splits: [156, 314, 471, 650, 792.65],
+                finalTime: 792.65
+            },
+            { // Ahmed - 13:12.92
+                name: "Ahmed",
+                splits: [156, 314, 472, 651, 792.92],
+                finalTime: 792.92
+            }
+        ];
+
+        // Shuffle race data to randomly assign to lanes
+        function shuffleArray(array) {
+            const shuffled = [...array];
+            for (let i = shuffled.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            }
+            return shuffled;
+        }
+
+        // Calculate target speed at a given distance based on splits
+        function getTargetSpeed(raceDataEntry, distance) {
+            const splits = raceDataEntry.splits;
+
+            // Find which segment we're in (each segment is 1000m)
+            const segmentIndex = Math.min(Math.floor(distance / 1000), 4);
+
+            // Calculate segment times
+            const segmentStart = segmentIndex * 1000;
+            const segmentEnd = (segmentIndex + 1) * 1000;
+
+            const timeAtStart = segmentIndex === 0 ? 0 : splits[segmentIndex - 1];
+            const timeAtEnd = splits[segmentIndex];
+            const segmentTime = timeAtEnd - timeAtStart;
+
+            // Speed for this segment (m/s)
+            return 1000 / segmentTime;
+        }
+
+        // Cooldown speed after finishing (half of average race pace)
+        const COOLDOWN_SPEED = 5000 / 791.3 / 2; // ~3.16 m/s
 
         // Colors for AI runners (lanes 2-8)
         const runnerColors = [
@@ -439,6 +558,9 @@
             return { x, z, rotation };
         }
 
+        // Shuffle race data for random lane assignment
+        const shuffledRaceData = shuffleArray(raceData);
+
         // Load character model for AI runners only
         const loader = new FBXLoader();
         loader.load(
@@ -478,6 +600,7 @@
                     if (fbx.animations.length > 0) {
                         aiAction = aiMixer.clipAction(fbx.animations[0]);
                         aiAction.play();
+                        aiAction.paused = true; // Start paused until race begins
                     }
 
                     aiRunners.push({
@@ -485,12 +608,21 @@
                         mixer: aiMixer,
                         action: aiAction,
                         lane: lane,
-                        distance: 0
+                        distance: 0,
+                        finished: false,
+                        raceData: shuffledRaceData[i],
+                        currentSpeed: 0,
+                        targetSpeed: 0
                     });
                 }
 
                 document.getElementById('loading').style.display = 'none';
                 console.log('AI Runners created:', aiRunners.length);
+
+                // Log lane assignments
+                aiRunners.forEach(r => {
+                    console.log(`Lane ${r.lane}: ${r.raceData.name}`);
+                });
             },
             (progress) => {
                 const percent = (progress.loaded / progress.total * 100).toFixed(0);
@@ -540,6 +672,53 @@
         });
 
         // ============================================
+        // RACE START FUNCTION
+        // ============================================
+
+        function startRace() {
+            if (raceStarted) return;
+
+            // Reset all runners to start line
+            for (const runner of aiRunners) {
+                runner.distance = 0;
+                runner.finished = false;
+                runner.currentSpeed = 0;
+
+                // Position at start line
+                const startPos = getTrackPosition(0, runner.lane);
+                runner.model.position.set(startPos.x, 0, startPos.z);
+                runner.model.rotation.y = startPos.rotation;
+
+                // Unpause animation
+                if (runner.action) {
+                    runner.action.paused = false;
+                }
+            }
+
+            // Reset camera to start line viewing position (lane 1 area)
+            const viewRadius = INNER_RADIUS + 0.5 * LANE_WIDTH;
+            camera.position.set(STRAIGHT_LENGTH / 2 + 5, 1.4, -viewRadius);
+            camera.lookAt(STRAIGHT_LENGTH / 2 - 10, 1.4, -viewRadius);
+
+            // Start the race
+            raceStarted = true;
+            raceTime = 0;
+
+            // Update UI
+            document.getElementById('startButton').textContent = 'RACE IN PROGRESS';
+            document.getElementById('startButton').disabled = true;
+            document.getElementById('raceInfo').style.display = 'block';
+
+            console.log('Race started!');
+        }
+
+        // Start button click handler
+        document.getElementById('startButton').addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent pointer lock
+            startRace();
+        });
+
+        // ============================================
         // ANIMATION LOOP
         // ============================================
 
@@ -583,19 +762,81 @@
                 }
             }
 
+            // Update race time
+            if (raceStarted) {
+                raceTime += delta;
+
+                // Update race info display
+                const minutes = Math.floor(raceTime / 60);
+                const seconds = (raceTime % 60).toFixed(1);
+                document.getElementById('raceInfo').innerHTML =
+                    `<strong>Race Time:</strong> ${minutes}:${seconds.padStart(4, '0')}<br>` +
+                    `<strong>Distance:</strong> ${Math.min(aiRunners[0]?.distance || 0, RACE_DISTANCE).toFixed(0)}m / 5000m`;
+            }
+
             // Update AI runners
             for (const runner of aiRunners) {
-                // Move forward at constant speed (400m/min = 6.67 m/s)
-                runner.distance += AI_SPEED * delta;
+                // Only move if race has started
+                if (!raceStarted) {
+                    // Keep animation paused before race
+                    if (runner.mixer) {
+                        runner.mixer.update(0);
+                    }
+                    continue;
+                }
+
+                // Check if runner has finished the 5K race
+                if (!runner.finished && runner.distance >= RACE_DISTANCE) {
+                    runner.finished = true;
+                    const finishTime = runner.raceData.finalTime;
+                    const finishMinutes = Math.floor(finishTime / 60);
+                    const finishSeconds = (finishTime % 60).toFixed(2);
+                    console.log(`${runner.raceData.name} (Lane ${runner.lane}) finished in ${finishMinutes}:${finishSeconds}!`);
+                }
+
+                // Calculate target speed based on splits
+                if (runner.finished) {
+                    runner.targetSpeed = COOLDOWN_SPEED;
+                } else {
+                    runner.targetSpeed = getTargetSpeed(runner.raceData, runner.distance);
+                }
+
+                // Smooth acceleration/deceleration toward target speed
+                const accelerationRate = 2.0; // m/s per second
+                if (runner.currentSpeed < runner.targetSpeed) {
+                    runner.currentSpeed = Math.min(
+                        runner.currentSpeed + accelerationRate * delta,
+                        runner.targetSpeed
+                    );
+                } else if (runner.currentSpeed > runner.targetSpeed) {
+                    runner.currentSpeed = Math.max(
+                        runner.currentSpeed - accelerationRate * delta,
+                        runner.targetSpeed
+                    );
+                }
+
+                // Move forward
+                runner.distance += runner.currentSpeed * delta;
 
                 // Get new position on track
                 const pos = getTrackPosition(runner.distance, runner.lane);
                 runner.model.position.set(pos.x, 0, pos.z);
                 runner.model.rotation.y = pos.rotation;
 
-                // Update animation
+                // Update animation (speed matches running speed)
                 if (runner.mixer) {
-                    runner.mixer.update(delta);
+                    // Scale animation speed based on current speed (base ~6.3 m/s = normal animation)
+                    const animationScale = runner.currentSpeed / 6.3;
+                    runner.mixer.update(delta * Math.max(0.5, animationScale));
+                }
+            }
+
+            // Check if all runners finished
+            if (raceStarted && aiRunners.length > 0 && aiRunners.every(r => r.finished)) {
+                if (document.getElementById('startButton').textContent !== 'RESTART RACE') {
+                    document.getElementById('startButton').textContent = 'RESTART RACE';
+                    document.getElementById('startButton').disabled = false;
+                    raceStarted = false; // Allow restart
                 }
             }
 
