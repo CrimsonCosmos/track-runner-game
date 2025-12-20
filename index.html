@@ -29,16 +29,15 @@
             border-radius: 8px;
             z-index: 100;
         }
-        #crosshair {
+        #loading {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            width: 20px;
-            height: 20px;
-            border: 2px solid rgba(255,255,255,0.5);
-            border-radius: 50%;
-            pointer-events: none;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 24px;
+            z-index: 200;
         }
     </style>
 </head>
@@ -50,7 +49,7 @@
         Shift - Sprint<br>
         Click to start
     </div>
-    <div id="crosshair"></div>
+    <div id="loading">Loading character...</div>
 
     <script type="importmap">
     {
@@ -63,16 +62,17 @@
 
     <script type="module">
         import * as THREE from 'three';
+        import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
         import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
+        import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
         // Scene setup
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB); // Sky blue
+        scene.background = new THREE.Color(0x87CEEB);
         scene.fog = new THREE.Fog(0x87CEEB, 100, 500);
 
-        // Camera (first-person)
+        // Camera
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 1.7, 0); // Eye height ~1.7m
 
         // Renderer
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -85,7 +85,7 @@
         document.body.appendChild(renderer.domElement);
 
         // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
 
         const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
@@ -101,33 +101,28 @@
         sunLight.shadow.camera.bottom = -150;
         scene.add(sunLight);
 
-        // Hemisphere light for natural outdoor feel
         const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3d5c3d, 0.6);
         scene.add(hemiLight);
 
         // ============================================
-        // TRACK GEOMETRY - Accurate 400m Track
+        // TRACK GEOMETRY
         // ============================================
 
-        // Standard 400m track dimensions
-        const STRAIGHT_LENGTH = 84.39; // meters
-        const INNER_RADIUS = 36.5; // meters (lane 1 inner edge)
-        const LANE_WIDTH = 1.22; // meters
+        const STRAIGHT_LENGTH = 84.39;
+        const INNER_RADIUS = 36.5;
+        const LANE_WIDTH = 1.22;
         const NUM_LANES = 8;
-        const TRACK_WIDTH = LANE_WIDTH * NUM_LANES; // ~9.76m
+        const TRACK_WIDTH = LANE_WIDTH * NUM_LANES;
 
-        // Create track surface texture (procedural)
         function createTrackTexture() {
             const canvas = document.createElement('canvas');
             canvas.width = 512;
             canvas.height = 512;
             const ctx = canvas.getContext('2d');
 
-            // Base dark rubber/asphalt color
             ctx.fillStyle = '#1a1a1a';
             ctx.fillRect(0, 0, 512, 512);
 
-            // Add subtle noise/grain for rubber texture
             for (let i = 0; i < 50000; i++) {
                 const x = Math.random() * 512;
                 const y = Math.random() * 512;
@@ -136,7 +131,6 @@
                 ctx.fillRect(x, y, 1, 1);
             }
 
-            // Add some subtle scratches
             ctx.strokeStyle = 'rgba(50, 50, 50, 0.3)';
             ctx.lineWidth = 0.5;
             for (let i = 0; i < 100; i++) {
@@ -155,18 +149,15 @@
             return texture;
         }
 
-        // Create normal map for rubber texture
         function createTrackNormalMap() {
             const canvas = document.createElement('canvas');
             canvas.width = 256;
             canvas.height = 256;
             const ctx = canvas.getContext('2d');
 
-            // Base normal (pointing up)
             ctx.fillStyle = '#8080ff';
             ctx.fillRect(0, 0, 256, 256);
 
-            // Add bumps
             for (let i = 0; i < 2000; i++) {
                 const x = Math.random() * 256;
                 const y = Math.random() * 256;
@@ -185,7 +176,6 @@
             return texture;
         }
 
-        // Track material (PBR)
         const trackMaterial = new THREE.MeshStandardMaterial({
             map: createTrackTexture(),
             normalMap: createTrackNormalMap(),
@@ -195,91 +185,65 @@
             color: 0x1a1a1a
         });
 
-        // Create the track shape
         function createTrackGeometry() {
             const shape = new THREE.Shape();
-
             const outerRadius = INNER_RADIUS + TRACK_WIDTH;
             const halfStraight = STRAIGHT_LENGTH / 2;
 
-            // Start at bottom left of outer edge
             shape.moveTo(-halfStraight, -(outerRadius));
-
-            // Bottom straight (left to right)
             shape.lineTo(halfStraight, -(outerRadius));
-
-            // Right curve (bottom to top)
             shape.absarc(halfStraight, 0, outerRadius, -Math.PI / 2, Math.PI / 2, false);
-
-            // Top straight (right to left)
             shape.lineTo(-halfStraight, outerRadius);
-
-            // Left curve (top to bottom)
             shape.absarc(-halfStraight, 0, outerRadius, Math.PI / 2, -Math.PI / 2, false);
 
-            // Inner cutout (hole)
             const hole = new THREE.Path();
             hole.moveTo(-halfStraight, -INNER_RADIUS);
             hole.lineTo(halfStraight, -INNER_RADIUS);
             hole.absarc(halfStraight, 0, INNER_RADIUS, -Math.PI / 2, Math.PI / 2, false);
             hole.lineTo(-halfStraight, INNER_RADIUS);
             hole.absarc(-halfStraight, 0, INNER_RADIUS, Math.PI / 2, -Math.PI / 2, false);
-
             shape.holes.push(hole);
 
             const geometry = new THREE.ShapeGeometry(shape, 64);
-            geometry.rotateX(-Math.PI / 2); // Lay flat
-
+            geometry.rotateX(-Math.PI / 2);
             return geometry;
         }
 
-        const trackGeometry = createTrackGeometry();
-        const track = new THREE.Mesh(trackGeometry, trackMaterial);
+        const track = new THREE.Mesh(createTrackGeometry(), trackMaterial);
         track.receiveShadow = true;
-        track.position.y = 0.01; // Slightly above ground
+        track.position.y = 0.01;
         scene.add(track);
 
-        // ============================================
-        // LANE MARKINGS
-        // ============================================
-
+        // Lane markings
         function createLaneMarkings() {
             const markingsGroup = new THREE.Group();
-
             const lineMaterial = new THREE.MeshStandardMaterial({
                 color: 0xffffff,
                 roughness: 0.6,
                 metalness: 0.0
             });
 
-            const lineWidth = 0.05; // 5cm wide lines
-            const lineHeight = 0.005; // Slightly raised
+            const lineWidth = 0.05;
+            const lineHeight = 0.005;
 
-            // Create lane lines
             for (let lane = 0; lane <= NUM_LANES; lane++) {
                 const radius = INNER_RADIUS + (lane * LANE_WIDTH);
                 const halfStraight = STRAIGHT_LENGTH / 2;
-
-                // Curved sections
                 const curveSegments = 32;
 
                 // Right curve
                 for (let i = 0; i < curveSegments; i++) {
                     const angle1 = -Math.PI / 2 + (Math.PI * i / curveSegments);
                     const angle2 = -Math.PI / 2 + (Math.PI * (i + 1) / curveSegments);
-
                     const x1 = halfStraight + Math.cos(angle1) * radius;
                     const z1 = Math.sin(angle1) * radius;
                     const x2 = halfStraight + Math.cos(angle2) * radius;
                     const z2 = Math.sin(angle2) * radius;
-
                     const length = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
                     const lineGeom = new THREE.BoxGeometry(length + 0.01, lineHeight, lineWidth);
                     const lineMesh = new THREE.Mesh(lineGeom, lineMaterial);
-
                     lineMesh.position.set((x1 + x2) / 2, lineHeight / 2 + 0.01, (z1 + z2) / 2);
                     lineMesh.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
-
                     markingsGroup.add(lineMesh);
                 }
 
@@ -287,61 +251,44 @@
                 for (let i = 0; i < curveSegments; i++) {
                     const angle1 = Math.PI / 2 + (Math.PI * i / curveSegments);
                     const angle2 = Math.PI / 2 + (Math.PI * (i + 1) / curveSegments);
-
                     const x1 = -halfStraight + Math.cos(angle1) * radius;
                     const z1 = Math.sin(angle1) * radius;
                     const x2 = -halfStraight + Math.cos(angle2) * radius;
                     const z2 = Math.sin(angle2) * radius;
-
                     const length = Math.sqrt((x2 - x1) ** 2 + (z2 - z1) ** 2);
                     const lineGeom = new THREE.BoxGeometry(length + 0.01, lineHeight, lineWidth);
                     const lineMesh = new THREE.Mesh(lineGeom, lineMaterial);
-
                     lineMesh.position.set((x1 + x2) / 2, lineHeight / 2 + 0.01, (z1 + z2) / 2);
                     lineMesh.rotation.y = -Math.atan2(z2 - z1, x2 - x1);
-
                     markingsGroup.add(lineMesh);
                 }
 
-                // Straight sections
-                // Bottom straight
-                const bottomLineGeom = new THREE.BoxGeometry(STRAIGHT_LENGTH, lineHeight, lineWidth);
-                const bottomLine = new THREE.Mesh(bottomLineGeom, lineMaterial);
+                // Straights
+                const straightGeom = new THREE.BoxGeometry(STRAIGHT_LENGTH, lineHeight, lineWidth);
+                const bottomLine = new THREE.Mesh(straightGeom, lineMaterial);
                 bottomLine.position.set(0, lineHeight / 2 + 0.01, -radius);
                 markingsGroup.add(bottomLine);
 
-                // Top straight
-                const topLine = new THREE.Mesh(bottomLineGeom, lineMaterial);
+                const topLine = new THREE.Mesh(straightGeom, lineMaterial);
                 topLine.position.set(0, lineHeight / 2 + 0.01, radius);
                 markingsGroup.add(topLine);
             }
 
-            // Start/Finish line
-            const finishLineGeom = new THREE.BoxGeometry(0.1, lineHeight, TRACK_WIDTH);
-            const finishLine = new THREE.Mesh(finishLineGeom, lineMaterial);
+            // Finish line
+            const finishGeom = new THREE.BoxGeometry(0.1, lineHeight, TRACK_WIDTH);
+            const finishLine = new THREE.Mesh(finishGeom, lineMaterial);
             finishLine.position.set(-STRAIGHT_LENGTH / 4, lineHeight / 2 + 0.015, -(INNER_RADIUS + TRACK_WIDTH / 2));
             markingsGroup.add(finishLine);
-
-            // Lane numbers
-            const laneNumberMaterial = new THREE.MeshStandardMaterial({
-                color: 0xffffff,
-                roughness: 0.6
-            });
 
             return markingsGroup;
         }
 
-        const laneMarkings = createLaneMarkings();
-        scene.add(laneMarkings);
+        scene.add(createLaneMarkings());
 
-        // ============================================
-        // INFIELD (Green grass area inside track)
-        // ============================================
-
+        // Infield
         function createInfield() {
             const shape = new THREE.Shape();
             const halfStraight = STRAIGHT_LENGTH / 2;
-
             shape.moveTo(-halfStraight, -INNER_RADIUS);
             shape.lineTo(halfStraight, -INNER_RADIUS);
             shape.absarc(halfStraight, 0, INNER_RADIUS, -Math.PI / 2, Math.PI / 2, false);
@@ -351,21 +298,19 @@
             const geometry = new THREE.ShapeGeometry(shape, 64);
             geometry.rotateX(-Math.PI / 2);
 
-            // Grass texture
             const grassCanvas = document.createElement('canvas');
             grassCanvas.width = 256;
             grassCanvas.height = 256;
-            const grassCtx = grassCanvas.getContext('2d');
-
-            grassCtx.fillStyle = '#2d5a27';
-            grassCtx.fillRect(0, 0, 256, 256);
+            const ctx = grassCanvas.getContext('2d');
+            ctx.fillStyle = '#2d5a27';
+            ctx.fillRect(0, 0, 256, 256);
 
             for (let i = 0; i < 10000; i++) {
                 const x = Math.random() * 256;
                 const y = Math.random() * 256;
                 const green = 40 + Math.random() * 50;
-                grassCtx.fillStyle = `rgb(${20 + Math.random() * 20}, ${green + 50}, ${20 + Math.random() * 20})`;
-                grassCtx.fillRect(x, y, 1, 2);
+                ctx.fillStyle = `rgb(${20 + Math.random() * 20}, ${green + 50}, ${20 + Math.random() * 20})`;
+                ctx.fillRect(x, y, 1, 2);
             }
 
             const grassTexture = new THREE.CanvasTexture(grassCanvas);
@@ -373,40 +318,40 @@
             grassTexture.wrapT = THREE.RepeatWrapping;
             grassTexture.repeat.set(15, 15);
 
-            const grassMaterial = new THREE.MeshStandardMaterial({
+            const material = new THREE.MeshStandardMaterial({
                 map: grassTexture,
                 roughness: 0.9,
                 metalness: 0.0
             });
 
-            const infield = new THREE.Mesh(geometry, grassMaterial);
-            infield.receiveShadow = true;
-            infield.position.y = -0.01;
-
-            return infield;
+            const mesh = new THREE.Mesh(geometry, material);
+            mesh.receiveShadow = true;
+            mesh.position.y = -0.01;
+            return mesh;
         }
 
         scene.add(createInfield());
 
-        // ============================================
-        // SURROUNDING AREA (Outside track)
-        // ============================================
-
-        const groundGeometry = new THREE.PlaneGeometry(500, 500);
-        const groundMaterial = new THREE.MeshStandardMaterial({
-            color: 0x3d5c3d,
-            roughness: 0.9
-        });
-        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        // Outer ground
+        const ground = new THREE.Mesh(
+            new THREE.PlaneGeometry(500, 500),
+            new THREE.MeshStandardMaterial({ color: 0x3d5c3d, roughness: 0.9 })
+        );
         ground.rotation.x = -Math.PI / 2;
         ground.position.y = -0.02;
         ground.receiveShadow = true;
         scene.add(ground);
 
         // ============================================
-        // FIRST-PERSON CONTROLS
+        // FIRST-PERSON CAMERA SETUP
         // ============================================
 
+        // Position camera on track (lane 1)
+        const startLane = 1;
+        const startRadius = INNER_RADIUS + (startLane - 0.5) * LANE_WIDTH;
+        camera.position.set(-STRAIGHT_LENGTH / 4, 1.4, -startRadius); // Eye height 1.4m
+
+        // Pointer lock controls for first-person
         const controls = new PointerLockControls(camera, document.body);
 
         document.addEventListener('click', () => {
@@ -421,9 +366,146 @@
             document.getElementById('info').style.display = 'block';
         });
 
-        // Movement
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
+        // ============================================
+        // AI RUNNERS SYSTEM
+        // ============================================
+
+        const AI_SPEED = 400 / 60; // 400 meters per minute = 6.67 m/s
+        const aiRunners = []; // Will hold { model, mixer, action, lane, distance }
+
+        // Colors for AI runners (lanes 2-8)
+        const runnerColors = [
+            0xcc2222, // Red
+            0x22cc22, // Green
+            0xcccc22, // Yellow
+            0xcc22cc, // Magenta
+            0x22cccc, // Cyan
+            0xff8800, // Orange
+            0x8822cc  // Purple
+        ];
+
+        // Calculate track length for a given lane
+        function getTrackLength(lane) {
+            const radius = INNER_RADIUS + (lane - 0.5) * LANE_WIDTH;
+            // Two straights + two semicircles
+            return (STRAIGHT_LENGTH * 2) + (2 * Math.PI * radius);
+        }
+
+        // Get position and rotation on track given distance traveled and lane
+        function getTrackPosition(distance, lane) {
+            const radius = INNER_RADIUS + (lane - 0.5) * LANE_WIDTH;
+            const trackLength = getTrackLength(lane);
+
+            // Normalize distance to track length (loop)
+            distance = distance % trackLength;
+
+            const halfStraight = STRAIGHT_LENGTH / 2;
+            const curveLength = Math.PI * radius;
+
+            let x, z, rotation;
+
+            const seg1End = STRAIGHT_LENGTH;
+            const seg2End = seg1End + curveLength;
+            const seg3End = seg2End + STRAIGHT_LENGTH;
+
+            if (distance < seg1End) {
+                // Bottom straight - running from right to left
+                const progress = distance;
+                x = halfStraight - progress;
+                z = -radius;
+                rotation = Math.PI;
+            } else if (distance < seg2End) {
+                // Left curve
+                const curveProgress = distance - seg1End;
+                const angle = -Math.PI/2 - (curveProgress / radius);
+                x = -halfStraight + Math.cos(angle) * radius;
+                z = Math.sin(angle) * radius;
+                rotation = angle - Math.PI/2;
+            } else if (distance < seg3End) {
+                // Top straight - running from left to right
+                const progress = distance - seg2End;
+                x = -halfStraight + progress;
+                z = radius;
+                rotation = 0;
+            } else {
+                // Right curve
+                const curveProgress = distance - seg3End;
+                const angle = Math.PI/2 - (curveProgress / radius);
+                x = halfStraight + Math.cos(angle) * radius;
+                z = Math.sin(angle) * radius;
+                rotation = angle - Math.PI/2;
+            }
+
+            return { x, z, rotation };
+        }
+
+        // Load character model for AI runners only
+        const loader = new FBXLoader();
+        loader.load(
+            'Running.fbx',
+            (fbx) => {
+                // Create AI runners in lanes 2-8
+                for (let i = 0; i < 7; i++) {
+                    const lane = i + 2; // Lanes 2-8
+                    const aiModel = (i === 0) ? fbx : SkeletonUtils.clone(fbx);
+                    aiModel.scale.setScalar(0.01);
+
+                    // Create unique material for this runner
+                    const aiMaterial = new THREE.MeshStandardMaterial({
+                        color: runnerColors[i],
+                        roughness: 0.7,
+                        metalness: 0.1
+                    });
+
+                    aiModel.traverse((child) => {
+                        if (child.isMesh) {
+                            child.castShadow = true;
+                            child.receiveShadow = true;
+                            child.material = aiMaterial;
+                        }
+                    });
+
+                    // Position at start line for their lane
+                    const startPos = getTrackPosition(0, lane);
+                    aiModel.position.set(startPos.x, 0, startPos.z);
+                    aiModel.rotation.y = startPos.rotation;
+
+                    scene.add(aiModel);
+
+                    // Setup animation for AI
+                    const aiMixer = new THREE.AnimationMixer(aiModel);
+                    let aiAction = null;
+                    if (fbx.animations.length > 0) {
+                        aiAction = aiMixer.clipAction(fbx.animations[0]);
+                        aiAction.play();
+                    }
+
+                    aiRunners.push({
+                        model: aiModel,
+                        mixer: aiMixer,
+                        action: aiAction,
+                        lane: lane,
+                        distance: 0
+                    });
+                }
+
+                document.getElementById('loading').style.display = 'none';
+                console.log('AI Runners created:', aiRunners.length);
+            },
+            (progress) => {
+                const percent = (progress.loaded / progress.total * 100).toFixed(0);
+                document.getElementById('loading').textContent = `Loading runners... ${percent}%`;
+            },
+            (error) => {
+                console.error('Error loading character:', error);
+                document.getElementById('loading').textContent = 'Error loading. Run: python3 -m http.server 8000';
+            }
+        );
+
+        // ============================================
+        // MOVEMENT CONTROLS
+        // ============================================
+
         let moveForward = false;
         let moveBackward = false;
         let moveLeft = false;
@@ -432,7 +514,8 @@
 
         const WALK_SPEED = 5;
         const SPRINT_SPEED = 12;
-        const DECELERATION = 10;
+        const velocity = new THREE.Vector3();
+        const direction = new THREE.Vector3();
 
         document.addEventListener('keydown', (event) => {
             switch (event.code) {
@@ -456,16 +539,11 @@
             }
         });
 
-        // Position player on the track (lane 4)
-        const startLane = 4;
-        const startRadius = INNER_RADIUS + (startLane - 0.5) * LANE_WIDTH;
-        camera.position.set(-STRAIGHT_LENGTH / 4, 1.7, -startRadius);
-        camera.lookAt(-STRAIGHT_LENGTH / 4 + 10, 1.7, -startRadius);
-
         // ============================================
         // ANIMATION LOOP
         // ============================================
 
+        const clock = new THREE.Clock();
         let prevTime = performance.now();
 
         function animate() {
@@ -475,14 +553,15 @@
             const delta = (time - prevTime) / 1000;
             prevTime = time;
 
+            // First-person movement (only when pointer is locked)
             if (controls.isLocked) {
                 const speed = sprint ? SPRINT_SPEED : WALK_SPEED;
 
-                // Apply deceleration
-                velocity.x -= velocity.x * DECELERATION * delta;
-                velocity.z -= velocity.z * DECELERATION * delta;
+                // Deceleration
+                velocity.x -= velocity.x * 10.0 * delta;
+                velocity.z -= velocity.z * 10.0 * delta;
 
-                // Get movement direction
+                // Movement direction
                 direction.z = Number(moveForward) - Number(moveBackward);
                 direction.x = Number(moveRight) - Number(moveLeft);
                 direction.normalize();
@@ -493,14 +572,30 @@
                 controls.moveRight(-velocity.x * delta);
                 controls.moveForward(-velocity.z * delta);
 
-                // Keep at eye height
-                camera.position.y = 1.7;
+                // Keep camera at eye height
+                camera.position.y = 1.4;
 
                 // Subtle head bob when moving
                 if (moveForward || moveBackward || moveLeft || moveRight) {
                     const bobSpeed = sprint ? 12 : 8;
-                    const bobAmount = sprint ? 0.05 : 0.03;
+                    const bobAmount = sprint ? 0.03 : 0.02;
                     camera.position.y += Math.sin(time * 0.001 * bobSpeed) * bobAmount;
+                }
+            }
+
+            // Update AI runners
+            for (const runner of aiRunners) {
+                // Move forward at constant speed (400m/min = 6.67 m/s)
+                runner.distance += AI_SPEED * delta;
+
+                // Get new position on track
+                const pos = getTrackPosition(runner.distance, runner.lane);
+                runner.model.position.set(pos.x, 0, pos.z);
+                runner.model.rotation.y = pos.rotation;
+
+                // Update animation
+                if (runner.mixer) {
+                    runner.mixer.update(delta);
                 }
             }
 
@@ -509,7 +604,7 @@
 
         animate();
 
-        // Handle window resize
+        // Window resize
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
