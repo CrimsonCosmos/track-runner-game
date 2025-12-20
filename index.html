@@ -503,6 +503,14 @@
             0x8822cc  // Purple
         ];
 
+        // Lane positioning constants
+        const SIDE_BY_SIDE_THRESHOLD = 2.5; // meters - if within this distance, considered "side by side"
+        const DRIFT_LEFT_SPEED = 0.8; // lanes per second - how fast runners drift toward lane 1
+        const PUSH_RIGHT_SPEED = 2.0; // lanes per second - how fast runners get pushed out
+        const MIN_LANE_POSITION = 0.6; // left edge of lane 1 (inside the lane)
+        const MAX_LANE_POSITION = 2.5; // can be pushed into lane 2 area
+        const RUNNER_WIDTH = 0.5; // approximate width of a runner in meters
+
         // Calculate track length for a given lane
         function getTrackLength(lane) {
             const radius = INNER_RADIUS + (lane - 0.5) * LANE_WIDTH;
@@ -607,7 +615,8 @@
                         model: aiModel,
                         mixer: aiMixer,
                         action: aiAction,
-                        lane: lane,
+                        lane: lane, // Starting lane (for staggered start positioning)
+                        lanePosition: 1.0, // Current lateral position (1.0 = lane 1 inside edge)
                         distance: 0,
                         finished: false,
                         raceData: shuffledRaceData[i],
@@ -683,8 +692,9 @@
                 runner.distance = 0;
                 runner.finished = false;
                 runner.currentSpeed = 0;
+                runner.lanePosition = 1.0; // Everyone starts targeting lane 1
 
-                // Position at start line
+                // Position at start line (use assigned lane for staggered start)
                 const startPos = getTrackPosition(0, runner.lane);
                 runner.model.position.set(startPos.x, 0, startPos.z);
                 runner.model.rotation.y = startPos.rotation;
@@ -818,8 +828,40 @@
                 // Move forward
                 runner.distance += runner.currentSpeed * delta;
 
-                // Get new position on track
-                const pos = getTrackPosition(runner.distance, runner.lane);
+                // ============================================
+                // LANE JOCKEYING LOGIC
+                // ============================================
+
+                // Check if any other runner is to our left and side-by-side
+                let blockedOnLeft = false;
+
+                for (const otherRunner of aiRunners) {
+                    if (otherRunner === runner) continue;
+
+                    // Check if they're close in distance (side by side)
+                    const distanceDiff = Math.abs(runner.distance - otherRunner.distance);
+                    if (distanceDiff > SIDE_BY_SIDE_THRESHOLD) continue;
+
+                    // Check if they're to our left (lower lane position)
+                    const laneDiff = runner.lanePosition - otherRunner.lanePosition;
+                    if (laneDiff > 0 && laneDiff < 1.2) {
+                        // Someone is to our left and close - we're blocked
+                        blockedOnLeft = true;
+
+                        // Push right to avoid collision
+                        const pushAmount = PUSH_RIGHT_SPEED * delta;
+                        runner.lanePosition = Math.min(runner.lanePosition + pushAmount, MAX_LANE_POSITION);
+                    }
+                }
+
+                // If not blocked on left, drift toward lane 1
+                if (!blockedOnLeft && runner.lanePosition > MIN_LANE_POSITION) {
+                    const driftAmount = DRIFT_LEFT_SPEED * delta;
+                    runner.lanePosition = Math.max(runner.lanePosition - driftAmount, MIN_LANE_POSITION);
+                }
+
+                // Get new position on track using dynamic lane position
+                const pos = getTrackPosition(runner.distance, runner.lanePosition);
                 runner.model.position.set(pos.x, 0, pos.z);
                 runner.model.rotation.y = pos.rotation;
 
