@@ -835,11 +835,11 @@
         ];
 
         // Lane positioning constants
-        const SIDE_BY_SIDE_THRESHOLD = 1.5; // meters - if within this distance, considered "side by side"
-        const DRIFT_LEFT_SPEED = 3.0; // lanes per second - how fast runners drift toward lane 1
-        const PUSH_RIGHT_SPEED = 4.0; // lanes per second - how fast runners get pushed out
-        const MIN_LANE_POSITION = 0.6; // left edge of lane 1 (inside the lane)
-        const MAX_LANE_POSITION = 2.5; // can be pushed into lane 2 area
+        const SIDE_BY_SIDE_THRESHOLD = 0.8; // meters - only spread if VERY close (nearly overlapping)
+        const DRIFT_LEFT_SPEED = 5.0; // lanes per second - how fast runners drift toward lane 1
+        const PUSH_RIGHT_SPEED = 8.0; // lanes per second - how fast runners get pushed out
+        const MIN_LANE_POSITION = 0.5; // left edge of lane 1 (inside the lane)
+        const MAX_LANE_POSITION = 2.0; // can be pushed into lane 2 area
         const RUNNER_WIDTH = 0.5; // approximate width of a runner in meters
 
         // Calculate track length for a given lane
@@ -1180,7 +1180,7 @@
                 // LANE JOCKEYING LOGIC
                 // ============================================
 
-                const RUNNER_SPACING = 0.7; // lanes between runners when side-by-side
+                const RUNNER_SPACING = 0.5; // lanes between runners when side-by-side (tighter packing)
 
                 // Sort all runners by distance to determine pack order
                 const sortedByDistance = [...aiRunners].sort((a, b) => b.distance - a.distance);
