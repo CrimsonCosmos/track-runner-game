@@ -318,10 +318,10 @@
         import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
         import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
-        // Scene setup
+        // Scene setup - 10 PM night race atmosphere
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x87CEEB);
-        scene.fog = new THREE.Fog(0x87CEEB, 100, 500);
+        scene.background = new THREE.Color(0x0a0a1a); // Dark night sky
+        scene.fog = new THREE.Fog(0x0a0a1a, 80, 300); // Dark fog for night atmosphere
 
         // Camera
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -336,24 +336,75 @@
         renderer.toneMappingExposure = 1.0;
         document.body.appendChild(renderer.domElement);
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        // Lighting - 10 PM stadium lights
+        const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.3); // Dim ambient for night
         scene.add(ambientLight);
 
-        const sunLight = new THREE.DirectionalLight(0xffffff, 1.5);
-        sunLight.position.set(50, 100, 50);
-        sunLight.castShadow = true;
-        sunLight.shadow.mapSize.width = 4096;
-        sunLight.shadow.mapSize.height = 4096;
-        sunLight.shadow.camera.near = 0.5;
-        sunLight.shadow.camera.far = 500;
-        sunLight.shadow.camera.left = -150;
-        sunLight.shadow.camera.right = 150;
-        sunLight.shadow.camera.top = 150;
-        sunLight.shadow.camera.bottom = -150;
-        scene.add(sunLight);
+        // Dim moonlight from above
+        const moonLight = new THREE.DirectionalLight(0x4466aa, 0.2);
+        moonLight.position.set(20, 100, 30);
+        scene.add(moonLight);
 
-        const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3d5c3d, 0.6);
+        // Stadium lights - bright white spotlights around the track
+        const stadiumLightColor = 0xfffaf0; // Warm white stadium lights
+        const stadiumLightIntensity = 1.5;
+
+        // Create stadium light poles with spotlights
+        function createStadiumLight(x, z, targetX, targetZ) {
+            // Light pole (simple cylinder)
+            const poleGeom = new THREE.CylinderGeometry(0.3, 0.4, 25, 8);
+            const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8 });
+            const pole = new THREE.Mesh(poleGeom, poleMat);
+            pole.position.set(x, 12.5, z);
+            scene.add(pole);
+
+            // Light housing
+            const housingGeom = new THREE.BoxGeometry(3, 1, 2);
+            const housingMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
+            const housing = new THREE.Mesh(housingGeom, housingMat);
+            housing.position.set(x, 25, z);
+            scene.add(housing);
+
+            // Spotlight
+            const spotlight = new THREE.SpotLight(stadiumLightColor, stadiumLightIntensity);
+            spotlight.position.set(x, 25, z);
+            spotlight.target.position.set(targetX, 0, targetZ);
+            spotlight.angle = Math.PI / 4;
+            spotlight.penumbra = 0.3;
+            spotlight.decay = 1;
+            spotlight.distance = 150;
+            spotlight.castShadow = true;
+            spotlight.shadow.mapSize.width = 1024;
+            spotlight.shadow.mapSize.height = 1024;
+            scene.add(spotlight);
+            scene.add(spotlight.target);
+
+            // Light glow effect
+            const glowGeom = new THREE.SphereGeometry(0.5, 8, 8);
+            const glowMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
+            const glow = new THREE.Mesh(glowGeom, glowMat);
+            glow.position.set(x, 24.5, z);
+            scene.add(glow);
+        }
+
+        // Place stadium lights around the track (outside the outer lane)
+        const lightRadius = INNER_RADIUS + TRACK_WIDTH + 15;
+        const halfStraight = STRAIGHT_LENGTH / 2;
+
+        // Lights along straights
+        createStadiumLight(-halfStraight + 20, -lightRadius, 0, -INNER_RADIUS - TRACK_WIDTH/2);
+        createStadiumLight(halfStraight - 20, -lightRadius, 0, -INNER_RADIUS - TRACK_WIDTH/2);
+        createStadiumLight(-halfStraight + 20, lightRadius, 0, INNER_RADIUS + TRACK_WIDTH/2);
+        createStadiumLight(halfStraight - 20, lightRadius, 0, INNER_RADIUS + TRACK_WIDTH/2);
+
+        // Lights at curves
+        createStadiumLight(-halfStraight - 20, -lightRadius + 30, -halfStraight, 0);
+        createStadiumLight(-halfStraight - 20, lightRadius - 30, -halfStraight, 0);
+        createStadiumLight(halfStraight + 20, -lightRadius + 30, halfStraight, 0);
+        createStadiumLight(halfStraight + 20, lightRadius - 30, halfStraight, 0);
+
+        // Hemisphere light for subtle sky/ground color bleed
+        const hemiLight = new THREE.HemisphereLight(0x1a1a3a, 0x0a0a0a, 0.2);
         scene.add(hemiLight);
 
         // ============================================
