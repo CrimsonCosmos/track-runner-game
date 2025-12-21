@@ -156,6 +156,71 @@
             z-index: 150;
             display: none;
         }
+        #paceSliderContainer {
+            position: absolute;
+            right: 30px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 100;
+            background: rgba(0,0,0,0.7);
+            padding: 20px 15px;
+            border-radius: 12px;
+        }
+        #paceSliderContainer label {
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 12px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        #paceSlider {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 200px;
+            height: 12px;
+            background: linear-gradient(to right, #22cc22, #cccc22, #cc2222);
+            border-radius: 6px;
+            outline: none;
+            transform: rotate(-90deg);
+            transform-origin: center center;
+            margin: 90px 0;
+        }
+        #paceSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+        }
+        #paceSlider::-moz-range-thumb {
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+            border: none;
+        }
+        #paceDisplay {
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 24px;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+        #paceUnit {
+            color: #aaa;
+            font-family: 'Arial', sans-serif;
+            font-size: 11px;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
@@ -181,6 +246,12 @@
     <div id="loading">Loading runners...</div>
     <button id="startButton" style="display: none;">PLAY</button>
     <div id="raceInfo"></div>
+    <div id="paceSliderContainer" style="display: none;">
+        <label>Pace</label>
+        <input type="range" id="paceSlider" min="3" max="12" step="0.1" value="8">
+        <div id="paceDisplay">8:00</div>
+        <div id="paceUnit">min/mile</div>
+    </div>
 
     <script type="importmap">
     {
@@ -902,6 +973,34 @@
         const velocity = new THREE.Vector3();
         const direction = new THREE.Vector3();
 
+        // ============================================
+        // PACE SLIDER / TREADMILL CONTROLS
+        // ============================================
+
+        const METERS_PER_MILE = 1609.34;
+        let userPaceMinPerMile = 8.0; // Default 8 min/mile
+        let userDistance = 0; // User's distance traveled on track
+        let userLanePosition = 1.0; // User runs in lane 1
+
+        function paceToSpeed(minPerMile) {
+            // Convert min/mile to m/s
+            const secondsPerMile = minPerMile * 60;
+            return METERS_PER_MILE / secondsPerMile;
+        }
+
+        function formatPace(minPerMile) {
+            const mins = Math.floor(minPerMile);
+            const secs = Math.round((minPerMile - mins) * 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        // Slider event listener
+        document.getElementById('paceSlider').addEventListener('input', (e) => {
+            // Slider is inverted: low value = fast pace, high value = slow pace
+            userPaceMinPerMile = parseFloat(e.target.value);
+            document.getElementById('paceDisplay').textContent = formatPace(userPaceMinPerMile);
+        });
+
         document.addEventListener('keydown', (event) => {
             switch (event.code) {
                 case 'KeyW': moveForward = true; break;
@@ -949,10 +1048,15 @@
                 }
             }
 
-            // Reset camera to start line viewing position (lane 1 area)
-            const viewRadius = INNER_RADIUS + 0.5 * LANE_WIDTH;
-            camera.position.set(STRAIGHT_LENGTH / 2 + 5, 1.4, -viewRadius);
-            camera.lookAt(STRAIGHT_LENGTH / 2 - 10, 1.4, -viewRadius);
+            // Reset user (camera) to start line in lane 1
+            userDistance = 0;
+            userLanePosition = 1.0;
+            const userStartPos = getTrackPosition(0, userLanePosition);
+            camera.position.set(userStartPos.x, 1.7, userStartPos.z);
+
+            // Look forward along track
+            const lookAheadPos = getTrackPosition(5, userLanePosition);
+            camera.lookAt(lookAheadPos.x, 1.7, lookAheadPos.z);
 
             // Start the race
             raceStarted = true;
@@ -992,8 +1096,43 @@
             const delta = (time - prevTime) / 1000;
             prevTime = time;
 
-            // First-person movement (only when pointer is locked)
-            if (controls.isLocked) {
+            // Move camera along track based on pace slider (when race is running)
+            if (raceStarted) {
+                const userSpeed = paceToSpeed(userPaceMinPerMile);
+                userDistance += userSpeed * delta;
+
+                // Get position on track
+                const userPos = getTrackPosition(userDistance, userLanePosition);
+
+                // Calculate forward direction (tangent to track)
+                const lookAheadDist = 2; // Look 2 meters ahead
+                const aheadPos = getTrackPosition(userDistance + lookAheadDist, userLanePosition);
+                const forwardDir = new THREE.Vector3(
+                    aheadPos.x - userPos.x,
+                    0,
+                    aheadPos.z - userPos.z
+                ).normalize();
+
+                // Update camera position
+                camera.position.x = userPos.x;
+                camera.position.z = userPos.z;
+                camera.position.y = 1.7; // Eye height
+
+                // Subtle head bob based on speed
+                const bobSpeed = userSpeed * 2;
+                const bobAmount = 0.02;
+                camera.position.y += Math.sin(time * 0.001 * bobSpeed) * bobAmount;
+
+                // If not using pointer lock, look forward along track
+                if (!controls.isLocked) {
+                    camera.lookAt(
+                        camera.position.x + forwardDir.x * 10,
+                        1.7,
+                        camera.position.z + forwardDir.z * 10
+                    );
+                }
+            } else if (controls.isLocked) {
+                // Manual movement before race starts
                 const speed = sprint ? SPRINT_SPEED : WALK_SPEED;
 
                 // Deceleration
@@ -1034,7 +1173,7 @@
                 const seconds = (raceTime % 60).toFixed(1);
                 document.getElementById('raceInfo').innerHTML =
                     `<strong>Race Time:</strong> ${minutes}:${seconds.padStart(4, '0')}<br>` +
-                    `<strong>Distance:</strong> ${Math.min(aiRunners[0]?.distance || 0, RACE_DISTANCE).toFixed(0)}m / 5000m`;
+                    `<strong>Your Distance:</strong> ${Math.min(userDistance, RACE_DISTANCE).toFixed(0)}m / 5000m`;
             }
 
             // Update AI runners
@@ -1220,10 +1359,11 @@
 
             console.log(`Goal time: ${formatTime(goalSeconds)}, Winner target: ${formatTime(winnerTargetTime)}, Scale factor: ${timeScaleFactor.toFixed(3)}`);
 
-            // Hide modal, show treadmill message
+            // Hide modal, show treadmill message and pace slider
             document.getElementById('goalTimeModal').style.display = 'none';
             document.getElementById('treadmillMessage').style.display = 'block';
             document.getElementById('startButton').style.display = 'block';
+            document.getElementById('paceSliderContainer').style.display = 'flex';
         });
 
         // Handle Enter key in input
