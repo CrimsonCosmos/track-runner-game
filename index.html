@@ -387,6 +387,15 @@
             scene.add(glow);
         }
 
+        // ============================================
+        // TRACK GEOMETRY CONSTANTS
+        // ============================================
+        const STRAIGHT_LENGTH = 84.39;
+        const INNER_RADIUS = 36.5;
+        const LANE_WIDTH = 1.22;
+        const NUM_LANES = 8;
+        const TRACK_WIDTH = LANE_WIDTH * NUM_LANES;
+
         // Place stadium lights around the track (outside the outer lane)
         const lightRadius = INNER_RADIUS + TRACK_WIDTH + 15;
         const halfStraight = STRAIGHT_LENGTH / 2;
@@ -406,16 +415,6 @@
         // Hemisphere light for subtle sky/ground color bleed
         const hemiLight = new THREE.HemisphereLight(0x1a1a3a, 0x0a0a0a, 0.2);
         scene.add(hemiLight);
-
-        // ============================================
-        // TRACK GEOMETRY
-        // ============================================
-
-        const STRAIGHT_LENGTH = 84.39;
-        const INNER_RADIUS = 36.5;
-        const LANE_WIDTH = 1.22;
-        const NUM_LANES = 8;
-        const TRACK_WIDTH = LANE_WIDTH * NUM_LANES;
 
         function createTrackTexture() {
             const canvas = document.createElement('canvas');
