@@ -111,21 +111,61 @@
             color: #aaa;
             font-size: 14px;
         }
-        #goalTimeInput {
-            font-size: 32px;
-            padding: 15px 20px;
-            width: 180px;
-            text-align: center;
-            border: 2px solid #444;
-            border-radius: 8px;
-            background: #111;
-            color: #fff;
-            font-family: 'Courier New', monospace;
+        #timePickerContainer {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
             margin: 20px 0;
         }
-        #goalTimeInput:focus {
-            outline: none;
-            border-color: #22cc22;
+        .scroll-picker {
+            width: 80px;
+            height: 150px;
+            overflow-y: scroll;
+            background: #111;
+            border: 2px solid #444;
+            border-radius: 8px;
+            scroll-snap-type: y mandatory;
+            -webkit-overflow-scrolling: touch;
+        }
+        .scroll-picker::-webkit-scrollbar {
+            display: none;
+        }
+        .scroll-picker {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .scroll-picker-inner {
+            padding: 60px 0;
+        }
+        .scroll-option {
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            font-family: 'Courier New', monospace;
+            color: #666;
+            scroll-snap-align: center;
+            cursor: pointer;
+            transition: color 0.2s, transform 0.2s;
+        }
+        .scroll-option.selected {
+            color: #fff;
+            font-weight: bold;
+            transform: scale(1.1);
+        }
+        .time-separator {
+            font-size: 36px;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+        }
+        .picker-label {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            margin-top: 5px;
         }
         #goalTimeSubmit {
             padding: 15px 40px;
@@ -227,9 +267,22 @@
     <div id="goalTimeModal">
         <div id="goalTimeForm">
             <h2>🏃 5K Treadmill Race</h2>
-            <p>Enter your goal time for this session</p>
-            <input type="text" id="goalTimeInput" placeholder="MM:SS" maxlength="8">
-            <p>Format: MM:SS (e.g., 25:00 for 25 minutes)</p>
+            <p>Select your goal time</p>
+            <div id="timePickerContainer">
+                <div style="text-align: center;">
+                    <div class="scroll-picker" id="minutesPicker">
+                        <div class="scroll-picker-inner" id="minutesInner"></div>
+                    </div>
+                    <div class="picker-label">min</div>
+                </div>
+                <span class="time-separator">:</span>
+                <div style="text-align: center;">
+                    <div class="scroll-picker" id="secondsPicker">
+                        <div class="scroll-picker-inner" id="secondsInner"></div>
+                    </div>
+                    <div class="picker-label">sec</div>
+                </div>
+            </div>
             <button id="goalTimeSubmit">SET GOAL</button>
         </div>
     </div>
@@ -1405,23 +1458,72 @@
 
         const ORIGINAL_WINNER_TIME = 791.3; // Ingebrigtsen's winning time in seconds
 
-        function parseTimeInput(input) {
-            // Parse MM:SS or M:SS format
-            const parts = input.trim().split(':');
-            if (parts.length === 2) {
-                const minutes = parseInt(parts[0], 10);
-                const seconds = parseInt(parts[1], 10);
-                if (!isNaN(minutes) && !isNaN(seconds)) {
-                    return minutes * 60 + seconds;
-                }
+        // Populate scroll pickers
+        let selectedMinutes = 25;
+        let selectedSeconds = 0;
+
+        function populatePickers() {
+            const minutesInner = document.getElementById('minutesInner');
+            const secondsInner = document.getElementById('secondsInner');
+
+            // Minutes: 10-60
+            for (let m = 10; m <= 60; m++) {
+                const div = document.createElement('div');
+                div.className = 'scroll-option';
+                div.textContent = m.toString().padStart(2, '0');
+                div.dataset.value = m;
+                div.addEventListener('click', () => scrollToOption(minutesPicker, m - 10));
+                minutesInner.appendChild(div);
             }
-            // Try parsing as just seconds
-            const totalSeconds = parseInt(input, 10);
-            if (!isNaN(totalSeconds)) {
-                return totalSeconds;
+
+            // Seconds: 0-59
+            for (let s = 0; s <= 59; s++) {
+                const div = document.createElement('div');
+                div.className = 'scroll-option';
+                div.textContent = s.toString().padStart(2, '0');
+                div.dataset.value = s;
+                div.addEventListener('click', () => scrollToOption(secondsPicker, s));
+                secondsInner.appendChild(div);
             }
-            return null;
         }
+
+        function scrollToOption(picker, index) {
+            const optionHeight = 50;
+            picker.scrollTo({ top: index * optionHeight, behavior: 'smooth' });
+        }
+
+        function updateSelectedFromScroll(picker, isMinutes) {
+            const optionHeight = 50;
+            const scrollTop = picker.scrollTop;
+            const index = Math.round(scrollTop / optionHeight);
+
+            const options = picker.querySelectorAll('.scroll-option');
+            options.forEach((opt, i) => {
+                opt.classList.toggle('selected', i === index);
+            });
+
+            if (isMinutes) {
+                selectedMinutes = index + 10; // Minutes start at 10
+            } else {
+                selectedSeconds = index;
+            }
+        }
+
+        const minutesPicker = document.getElementById('minutesPicker');
+        const secondsPicker = document.getElementById('secondsPicker');
+
+        populatePickers();
+
+        // Set initial scroll position (25:00)
+        setTimeout(() => {
+            scrollToOption(minutesPicker, 15); // 25 minutes (index 15 since we start at 10)
+            scrollToOption(secondsPicker, 0);  // 0 seconds
+            updateSelectedFromScroll(minutesPicker, true);
+            updateSelectedFromScroll(secondsPicker, false);
+        }, 100);
+
+        minutesPicker.addEventListener('scroll', () => updateSelectedFromScroll(minutesPicker, true));
+        secondsPicker.addEventListener('scroll', () => updateSelectedFromScroll(secondsPicker, false));
 
         function formatTime(seconds) {
             const mins = Math.floor(seconds / 60);
@@ -1430,11 +1532,10 @@
         }
 
         document.getElementById('goalTimeSubmit').addEventListener('click', () => {
-            const input = document.getElementById('goalTimeInput').value;
-            const goalSeconds = parseTimeInput(input);
+            const goalSeconds = selectedMinutes * 60 + selectedSeconds;
 
-            if (goalSeconds === null || goalSeconds < 600 || goalSeconds > 3600) {
-                alert('Please enter a valid time between 10:00 and 60:00');
+            if (goalSeconds < 600 || goalSeconds > 3600) {
+                alert('Please select a valid time between 10:00 and 60:00');
                 return;
             }
 
@@ -1451,13 +1552,6 @@
             document.getElementById('treadmillMessage').style.display = 'block';
             document.getElementById('startButton').style.display = 'block';
             document.getElementById('paceSliderContainer').style.display = 'flex';
-        });
-
-        // Handle Enter key in input
-        document.getElementById('goalTimeInput').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                document.getElementById('goalTimeSubmit').click();
-            }
         });
 
         // Update start button to hide treadmill message when clicked
