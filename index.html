@@ -842,6 +842,10 @@
         const MAX_LANE_POSITION = 2.0; // can be pushed into lane 2 area
         const RUNNER_WIDTH = 0.5; // approximate width of a runner in meters
 
+        // Collision constants
+        const COLLISION_RADIUS = 0.4; // meters - personal space bubble around each runner
+        const COLLISION_PUSH_STRENGTH = 3.0; // How strongly runners push each other apart
+
         // Calculate track length for a given lane
         function getTrackLength(lane) {
             const radius = INNER_RADIUS + (lane - 0.5) * LANE_WIDTH;
@@ -1234,6 +1238,80 @@
                     const animationScale = runner.currentSpeed / 6.3;
                     runner.mixer.update(delta * Math.max(0.5, animationScale));
                 }
+            }
+
+            // ============================================
+            // COLLISION RESOLUTION
+            // ============================================
+            if (raceStarted && aiRunners.length > 0) {
+                // Build list of all runners including user
+                const allRunners = [
+                    { distance: userDistance, lanePosition: userLanePosition, isUser: true }
+                ];
+                for (const runner of aiRunners) {
+                    allRunners.push({
+                        distance: runner.distance,
+                        lanePosition: runner.lanePosition,
+                        ref: runner,
+                        isUser: false
+                    });
+                }
+
+                // Check collisions between all pairs
+                for (let i = 0; i < allRunners.length; i++) {
+                    for (let j = i + 1; j < allRunners.length; j++) {
+                        const a = allRunners[i];
+                        const b = allRunners[j];
+
+                        // Get world positions
+                        const posA = getTrackPosition(a.distance, a.lanePosition);
+                        const posB = getTrackPosition(b.distance, b.lanePosition);
+
+                        // Calculate distance between runners
+                        const dx = posB.x - posA.x;
+                        const dz = posB.z - posA.z;
+                        const dist = Math.sqrt(dx * dx + dz * dz);
+
+                        const minDist = COLLISION_RADIUS * 2;
+
+                        if (dist < minDist && dist > 0.01) {
+                            // Collision! Push apart
+                            const overlap = minDist - dist;
+                            const pushAmount = overlap * COLLISION_PUSH_STRENGTH * delta;
+
+                            // Determine who's ahead (they get priority to stay in lane 1)
+                            const aAhead = a.distance > b.distance;
+
+                            // Push the one behind outward (increase lane position)
+                            if (aAhead) {
+                                // B is behind, push B outward
+                                if (!b.isUser) {
+                                    b.ref.lanePosition = Math.min(b.ref.lanePosition + pushAmount, MAX_LANE_POSITION + 1);
+                                } else {
+                                    userLanePosition = Math.min(userLanePosition + pushAmount, MAX_LANE_POSITION + 1);
+                                }
+                            } else {
+                                // A is behind, push A outward
+                                if (!a.isUser) {
+                                    a.ref.lanePosition = Math.min(a.ref.lanePosition + pushAmount, MAX_LANE_POSITION + 1);
+                                } else {
+                                    userLanePosition = Math.min(userLanePosition + pushAmount, MAX_LANE_POSITION + 1);
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // Update AI runner positions after collision resolution
+                for (const runner of aiRunners) {
+                    const pos = getTrackPosition(runner.distance, runner.lanePosition);
+                    runner.model.position.set(pos.x, 0, pos.z);
+                }
+
+                // Update camera position if user was pushed
+                const userPos = getTrackPosition(userDistance, userLanePosition);
+                camera.position.x = userPos.x;
+                camera.position.z = userPos.z;
             }
 
             // Check for last lap bell
