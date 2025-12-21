@@ -394,6 +394,93 @@
         // Initialize display
         updateClockDisplay(0);
 
+        // ============================================
+        // LAST LAP BELL SOUND
+        // ============================================
+
+        let audioContext = null;
+        let lastLapBellPlayed = false;
+        const LAST_LAP_DISTANCE = 4800; // 12 laps completed, starting lap 13 (last lap of 5K)
+
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return audioContext;
+        }
+
+        function playLastLapBell(volume = 1.0) {
+            const ctx = initAudio();
+            if (ctx.state === 'suspended') {
+                ctx.resume();
+            }
+
+            // Create a bell-like sound using multiple oscillators
+            const now = ctx.currentTime;
+
+            // Main bell tone
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.type = 'sine';
+            osc1.frequency.setValueAtTime(800, now);
+            osc1.frequency.exponentialRampToValueAtTime(600, now + 0.5);
+            gain1.gain.setValueAtTime(0.5 * volume, now);
+            gain1.gain.exponentialRampToValueAtTime(0.01, now + 1.0);
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+
+            // Harmonic overtone
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(1200, now);
+            osc2.frequency.exponentialRampToValueAtTime(900, now + 0.4);
+            gain2.gain.setValueAtTime(0.3 * volume, now);
+            gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+
+            // Higher harmonic for shimmer
+            const osc3 = ctx.createOscillator();
+            const gain3 = ctx.createGain();
+            osc3.type = 'sine';
+            osc3.frequency.setValueAtTime(2400, now);
+            gain3.gain.setValueAtTime(0.15 * volume, now);
+            gain3.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+            osc3.connect(gain3);
+            gain3.connect(ctx.destination);
+
+            // Start and stop oscillators
+            osc1.start(now);
+            osc2.start(now);
+            osc3.start(now);
+            osc1.stop(now + 1.0);
+            osc2.stop(now + 0.6);
+            osc3.stop(now + 0.3);
+
+            // Play a second bell hit shortly after for emphasis
+            setTimeout(() => {
+                const now2 = ctx.currentTime;
+                const osc4 = ctx.createOscillator();
+                const gain4 = ctx.createGain();
+                osc4.type = 'sine';
+                osc4.frequency.setValueAtTime(850, now2);
+                osc4.frequency.exponentialRampToValueAtTime(650, now2 + 0.5);
+                gain4.gain.setValueAtTime(0.4 * volume, now2);
+                gain4.gain.exponentialRampToValueAtTime(0.01, now2 + 0.8);
+                osc4.connect(gain4);
+                gain4.connect(ctx.destination);
+                osc4.start(now2);
+                osc4.stop(now2 + 0.8);
+            }, 300);
+        }
+
+        function getDistanceToLeader(leaderPosition) {
+            const dx = camera.position.x - leaderPosition.x;
+            const dz = camera.position.z - leaderPosition.z;
+            return Math.sqrt(dx * dx + dz * dz);
+        }
+
         // Infield
         function createInfield() {
             const shape = new THREE.Shape();
@@ -782,6 +869,9 @@
             // Reset clock display
             updateClockDisplay(0);
 
+            // Reset last lap bell
+            lastLapBellPlayed = false;
+
             // Update UI
             document.getElementById('startButton').textContent = 'RACE IN PROGRESS';
             document.getElementById('startButton').disabled = true;
@@ -946,6 +1036,27 @@
                     // Scale animation speed based on current speed (base ~6.3 m/s = normal animation)
                     const animationScale = runner.currentSpeed / 6.3;
                     runner.mixer.update(delta * Math.max(0.5, animationScale));
+                }
+            }
+
+            // Check for last lap bell
+            if (raceStarted && !lastLapBellPlayed && aiRunners.length > 0) {
+                // Find the leader (runner with most distance)
+                const leader = aiRunners.reduce((max, r) => r.distance > max.distance ? r : max, aiRunners[0]);
+
+                if (leader.distance >= LAST_LAP_DISTANCE) {
+                    // Calculate distance from camera to leader for volume
+                    const leaderPos = getTrackPosition(leader.distance, leader.lanePosition);
+                    const distToLeader = getDistanceToLeader(leaderPos);
+
+                    // Volume based on distance (full volume up close, minimum 0.2 at 200m away)
+                    const maxDistance = 200;
+                    const minVolume = 0.2;
+                    const volume = Math.max(minVolume, 1.0 - (distToLeader / maxDistance) * (1.0 - minVolume));
+
+                    playLastLapBell(volume);
+                    lastLapBellPlayed = true;
+                    console.log(`Last lap bell! Leader at ${leader.distance.toFixed(0)}m, distance to camera: ${distToLeader.toFixed(0)}m, volume: ${volume.toFixed(2)}`);
                 }
             }
 
