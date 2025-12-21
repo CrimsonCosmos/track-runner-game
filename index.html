@@ -237,11 +237,9 @@
         Get your treadmill to desired speed,<br>then press <strong>'Play'</strong>!
     </div>
     <div id="info">
-        <strong>5K Track Race</strong><br><br>
-        WASD - Move<br>
-        Mouse - Look around<br>
-        Shift - Sprint<br>
-        Click to enable controls
+        <strong>5K Treadmill Race</strong><br><br>
+        Use slider to set pace<br>
+        Drag to look around
     </div>
     <div id="loading">Loading runners...</div>
     <button id="startButton" style="display: none;">PLAY</button>
@@ -265,7 +263,6 @@
     <script type="module">
         import * as THREE from 'three';
         import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-        import { PointerLockControls } from 'three/addons/controls/PointerLockControls.js';
         import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
         // Scene setup
@@ -705,19 +702,38 @@
         const startRadius = INNER_RADIUS + (startLane - 0.5) * LANE_WIDTH;
         camera.position.set(-STRAIGHT_LENGTH / 4, 1.4, -startRadius); // Eye height 1.4m
 
-        // Pointer lock controls for first-person
-        const controls = new PointerLockControls(camera, document.body);
+        // Drag-to-look controls (temporary look direction while dragging)
+        let isDragging = false;
+        let lookOffsetX = 0; // Horizontal look offset (yaw)
+        let lookOffsetY = 0; // Vertical look offset (pitch)
+        const MAX_LOOK_OFFSET_X = Math.PI / 2; // Max 90 degrees left/right
+        const MAX_LOOK_OFFSET_Y = Math.PI / 4; // Max 45 degrees up/down
+        const SNAP_BACK_SPEED = 8; // How fast view snaps back
 
-        document.addEventListener('click', () => {
-            controls.lock();
+        document.addEventListener('mousedown', (e) => {
+            if (raceStarted && e.button === 0) {
+                isDragging = true;
+            }
         });
 
-        controls.addEventListener('lock', () => {
-            document.getElementById('info').style.display = 'none';
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
         });
 
-        controls.addEventListener('unlock', () => {
-            document.getElementById('info').style.display = 'block';
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging && raceStarted) {
+                lookOffsetX -= e.movementX * 0.003;
+                lookOffsetY -= e.movementY * 0.003;
+
+                // Clamp offsets
+                lookOffsetX = Math.max(-MAX_LOOK_OFFSET_X, Math.min(MAX_LOOK_OFFSET_X, lookOffsetX));
+                lookOffsetY = Math.max(-MAX_LOOK_OFFSET_Y, Math.min(MAX_LOOK_OFFSET_Y, lookOffsetY));
+            }
+        });
+
+        // Prevent context menu on right-click
+        document.addEventListener('contextmenu', (e) => {
+            if (raceStarted) e.preventDefault();
         });
 
         // ============================================
@@ -959,21 +975,6 @@
         );
 
         // ============================================
-        // MOVEMENT CONTROLS
-        // ============================================
-
-        let moveForward = false;
-        let moveBackward = false;
-        let moveLeft = false;
-        let moveRight = false;
-        let sprint = false;
-
-        const WALK_SPEED = 5;
-        const SPRINT_SPEED = 12;
-        const velocity = new THREE.Vector3();
-        const direction = new THREE.Vector3();
-
-        // ============================================
         // PACE SLIDER / TREADMILL CONTROLS
         // ============================================
 
@@ -996,31 +997,8 @@
 
         // Slider event listener
         document.getElementById('paceSlider').addEventListener('input', (e) => {
-            // Slider is inverted: low value = fast pace, high value = slow pace
             userPaceMinPerMile = parseFloat(e.target.value);
             document.getElementById('paceDisplay').textContent = formatPace(userPaceMinPerMile);
-        });
-
-        document.addEventListener('keydown', (event) => {
-            switch (event.code) {
-                case 'KeyW': moveForward = true; break;
-                case 'KeyS': moveBackward = true; break;
-                case 'KeyA': moveLeft = true; break;
-                case 'KeyD': moveRight = true; break;
-                case 'ShiftLeft':
-                case 'ShiftRight': sprint = true; break;
-            }
-        });
-
-        document.addEventListener('keyup', (event) => {
-            switch (event.code) {
-                case 'KeyW': moveForward = false; break;
-                case 'KeyS': moveBackward = false; break;
-                case 'KeyA': moveLeft = false; break;
-                case 'KeyD': moveRight = false; break;
-                case 'ShiftLeft':
-                case 'ShiftRight': sprint = false; break;
-            }
         });
 
         // ============================================
@@ -1068,10 +1046,10 @@
             // Reset last lap bell
             lastLapBellPlayed = false;
 
-            // Update UI
-            document.getElementById('startButton').textContent = 'RACE IN PROGRESS';
-            document.getElementById('startButton').disabled = true;
-            document.getElementById('raceInfo').style.display = 'block';
+            // Hide all HUD elements during race
+            document.getElementById('startButton').style.display = 'none';
+            document.getElementById('raceInfo').style.display = 'none';
+            document.getElementById('info').style.display = 'none';
 
             console.log('Race started!');
         }
@@ -1123,42 +1101,27 @@
                 const bobAmount = 0.02;
                 camera.position.y += Math.sin(time * 0.001 * bobSpeed) * bobAmount;
 
-                // If not using pointer lock, look forward along track
-                if (!controls.isLocked) {
-                    camera.lookAt(
-                        camera.position.x + forwardDir.x * 10,
-                        1.7,
-                        camera.position.z + forwardDir.z * 10
-                    );
+                // Snap look offset back to center when not dragging
+                if (!isDragging) {
+                    lookOffsetX *= (1 - SNAP_BACK_SPEED * delta);
+                    lookOffsetY *= (1 - SNAP_BACK_SPEED * delta);
+                    // Snap to zero when very close
+                    if (Math.abs(lookOffsetX) < 0.01) lookOffsetX = 0;
+                    if (Math.abs(lookOffsetY) < 0.01) lookOffsetY = 0;
                 }
-            } else if (controls.isLocked) {
-                // Manual movement before race starts
-                const speed = sprint ? SPRINT_SPEED : WALK_SPEED;
 
-                // Deceleration
-                velocity.x -= velocity.x * 10.0 * delta;
-                velocity.z -= velocity.z * 10.0 * delta;
+                // Calculate look direction with offset
+                const baseYaw = Math.atan2(forwardDir.x, forwardDir.z);
+                const lookYaw = baseYaw + lookOffsetX;
+                const lookPitch = lookOffsetY;
 
-                // Movement direction
-                direction.z = Number(moveForward) - Number(moveBackward);
-                direction.x = Number(moveRight) - Number(moveLeft);
-                direction.normalize();
+                // Look in the offset direction
+                const lookDist = 10;
+                const lookX = camera.position.x + Math.sin(lookYaw) * Math.cos(lookPitch) * lookDist;
+                const lookY = camera.position.y + Math.sin(lookPitch) * lookDist;
+                const lookZ = camera.position.z + Math.cos(lookYaw) * Math.cos(lookPitch) * lookDist;
 
-                if (moveForward || moveBackward) velocity.z -= direction.z * speed * delta * 50;
-                if (moveLeft || moveRight) velocity.x -= direction.x * speed * delta * 50;
-
-                controls.moveRight(-velocity.x * delta);
-                controls.moveForward(-velocity.z * delta);
-
-                // Keep camera at eye height
-                camera.position.y = 1.4;
-
-                // Subtle head bob when moving
-                if (moveForward || moveBackward || moveLeft || moveRight) {
-                    const bobSpeed = sprint ? 12 : 8;
-                    const bobAmount = sprint ? 0.03 : 0.02;
-                    camera.position.y += Math.sin(time * 0.001 * bobSpeed) * bobAmount;
-                }
+                camera.lookAt(lookX, lookY, lookZ);
             }
 
             // Update race time
@@ -1167,13 +1130,6 @@
 
                 // Update 3D clock display
                 updateClockDisplay(raceTime);
-
-                // Update race info display
-                const minutes = Math.floor(raceTime / 60);
-                const seconds = (raceTime % 60).toFixed(1);
-                document.getElementById('raceInfo').innerHTML =
-                    `<strong>Race Time:</strong> ${minutes}:${seconds.padStart(4, '0')}<br>` +
-                    `<strong>Your Distance:</strong> ${Math.min(userDistance, RACE_DISTANCE).toFixed(0)}m / 5000m`;
             }
 
             // Update AI runners
