@@ -947,7 +947,7 @@
                         mixer: aiMixer,
                         action: aiAction,
                         lane: lane, // Starting lane (for staggered start positioning)
-                        lanePosition: 1.0, // Current lateral position (1.0 = lane 1 inside edge)
+                        lanePosition: lane, // Start at assigned lane, will drift to lane 1
                         distance: 0,
                         finished: false,
                         raceData: shuffledRaceData[i],
@@ -1013,7 +1013,7 @@
                 runner.distance = 0;
                 runner.finished = false;
                 runner.currentSpeed = 0;
-                runner.lanePosition = 1.0; // Everyone starts targeting lane 1
+                runner.lanePosition = runner.lane; // Start at assigned lane, will drift to lane 1 gradually
 
                 // Position at start line (use assigned lane for staggered start)
                 const startPos = getTrackPosition(0, runner.lane);
