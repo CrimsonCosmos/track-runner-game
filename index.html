@@ -1184,42 +1184,51 @@
                 // LANE JOCKEYING LOGIC
                 // ============================================
 
-                // Only spread out if another runner is at NEARLY THE SAME distance
-                // (truly side-by-side, not just in a line)
-                const OVERLAP_THRESHOLD = 0.5; // meters - must be THIS close to force spreading
-                const RUNNER_SPACING = 0.4; // lanes between overlapping runners
-
-                // Count runners who are at nearly the same distance AND to my inside
+                // Check if any runner is nearby (to prevent drift when close to others)
+                const NEARBY_THRESHOLD = 1.5; // meters - don't drift if someone this close
+                let someoneNearby = false;
                 let runnersBlockingInside = 0;
 
                 for (const other of aiRunners) {
                     if (other === runner) continue;
 
-                    // Check if they're at nearly the same distance (truly side-by-side)
                     const distanceDiff = Math.abs(runner.distance - other.distance);
-                    if (distanceDiff > OVERLAP_THRESHOLD) continue; // Not overlapping, ignore
 
-                    // They're at same distance - check if they're to my inside
-                    if (other.lanePosition < runner.lanePosition - 0.1) {
+                    // Check if someone is nearby (for drift suppression)
+                    if (distanceDiff < NEARBY_THRESHOLD) {
+                        const posMe = getTrackPosition(runner.distance, runner.lanePosition);
+                        const posOther = getTrackPosition(other.distance, other.lanePosition);
+                        const dx = posOther.x - posMe.x;
+                        const dz = posOther.z - posMe.z;
+                        const worldDist = Math.sqrt(dx * dx + dz * dz);
+
+                        if (worldDist < COLLISION_RADIUS * 3) {
+                            someoneNearby = true;
+                        }
+                    }
+
+                    // Count runners blocking inside (at same distance)
+                    if (distanceDiff < 0.5 && other.lanePosition < runner.lanePosition - 0.1) {
                         runnersBlockingInside++;
                     }
                 }
 
-                // Target lane: lane 1 unless someone is blocking my inside at same distance
+                // Target lane: lane 1 unless someone is blocking
+                const RUNNER_SPACING = 0.4;
                 const targetLanePosition = Math.min(
                     MIN_LANE_POSITION + (runnersBlockingInside * RUNNER_SPACING),
                     MAX_LANE_POSITION
                 );
 
-                // Smoothly move toward target position
-                if (runner.lanePosition < targetLanePosition - 0.02) {
-                    // Need to move right (someone blocking inside)
-                    const pushAmount = PUSH_RIGHT_SPEED * delta;
-                    runner.lanePosition = Math.min(runner.lanePosition + pushAmount, MAX_LANE_POSITION);
-                } else if (runner.lanePosition > targetLanePosition + 0.02) {
-                    // Can drift left toward lane 1
-                    const driftAmount = DRIFT_LEFT_SPEED * delta;
-                    runner.lanePosition = Math.max(runner.lanePosition - driftAmount, MIN_LANE_POSITION);
+                // Only adjust lane position if NOT near another runner (prevents vibration)
+                if (!someoneNearby) {
+                    if (runner.lanePosition < targetLanePosition - 0.02) {
+                        const pushAmount = PUSH_RIGHT_SPEED * delta;
+                        runner.lanePosition = Math.min(runner.lanePosition + pushAmount, MAX_LANE_POSITION);
+                    } else if (runner.lanePosition > targetLanePosition + 0.02) {
+                        const driftAmount = DRIFT_LEFT_SPEED * delta;
+                        runner.lanePosition = Math.max(runner.lanePosition - driftAmount, MIN_LANE_POSITION);
+                    }
                 }
 
                 // Get new position on track using dynamic lane position
