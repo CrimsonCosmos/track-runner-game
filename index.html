@@ -1216,7 +1216,12 @@
                 // Get new position on track using dynamic lane position
                 const pos = getTrackPosition(runner.distance, runner.lanePosition);
                 runner.model.position.set(pos.x, 0, pos.z);
-                runner.model.rotation.y = pos.rotation;
+
+                // Calculate forward direction by looking ahead on track (like camera does)
+                const lookAheadDist = 1.0;
+                const aheadPos = getTrackPosition(runner.distance + lookAheadDist, runner.lanePosition);
+                const forwardAngle = Math.atan2(aheadPos.x - pos.x, aheadPos.z - pos.z);
+                runner.model.rotation.y = forwardAngle;
 
                 // Update animation (speed matches running speed)
                 if (runner.mixer) {
