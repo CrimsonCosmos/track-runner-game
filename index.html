@@ -1241,7 +1241,7 @@
             }
 
             // ============================================
-            // COLLISION RESOLUTION
+            // COLLISION RESOLUTION (Pass on right only)
             // ============================================
             if (raceStarted && aiRunners.length > 0) {
                 // Build list of all runners including user
@@ -1263,6 +1263,13 @@
                         const a = allRunners[i];
                         const b = allRunners[j];
 
+                        // Check if runners are close enough to interact
+                        const distanceDiff = Math.abs(a.distance - b.distance);
+                        const laneDiff = Math.abs(a.lanePosition - b.lanePosition);
+
+                        // Only check if within interaction range (close in distance and lane)
+                        if (distanceDiff > 2.0 || laneDiff > 1.5) continue;
+
                         // Get world positions
                         const posA = getTrackPosition(a.distance, a.lanePosition);
                         const posB = getTrackPosition(b.distance, b.lanePosition);
@@ -1274,28 +1281,55 @@
 
                         const minDist = COLLISION_RADIUS * 2;
 
+                        // Determine who's ahead and who's on inside
+                        const aAhead = a.distance > b.distance;
+                        const aOnInside = a.lanePosition < b.lanePosition;
+
+                        // RULE: Can only pass on the RIGHT (outside/higher lane position)
+                        // If trying to pass on inside, block them
+
                         if (dist < minDist && dist > 0.01) {
-                            // Collision! Push apart
+                            // Physical collision - push apart
                             const overlap = minDist - dist;
                             const pushAmount = overlap * COLLISION_PUSH_STRENGTH * delta;
 
-                            // Determine who's ahead (they get priority to stay in lane 1)
-                            const aAhead = a.distance > b.distance;
-
-                            // Push the one behind outward (increase lane position)
+                            // Push the one behind outward
                             if (aAhead) {
-                                // B is behind, push B outward
                                 if (!b.isUser) {
                                     b.ref.lanePosition = Math.min(b.ref.lanePosition + pushAmount, MAX_LANE_POSITION + 1);
                                 } else {
                                     userLanePosition = Math.min(userLanePosition + pushAmount, MAX_LANE_POSITION + 1);
                                 }
                             } else {
-                                // A is behind, push A outward
                                 if (!a.isUser) {
                                     a.ref.lanePosition = Math.min(a.ref.lanePosition + pushAmount, MAX_LANE_POSITION + 1);
                                 } else {
                                     userLanePosition = Math.min(userLanePosition + pushAmount, MAX_LANE_POSITION + 1);
+                                }
+                            }
+                        }
+
+                        // BLOCKING: Prevent passing on the inside (left)
+                        // If someone behind is on the inside, they can't pass - must slow down or go around
+                        const blockingThreshold = 1.0; // meters - blocking zone
+                        if (distanceDiff < blockingThreshold) {
+                            if (aAhead && !aOnInside) {
+                                // A is ahead, B is on inside trying to pass - block B
+                                if (!b.isUser) {
+                                    // Cap B's distance to not pass A on the inside
+                                    const maxDist = a.distance - 0.3; // Stay behind
+                                    if (b.ref.distance > maxDist && b.lanePosition <= a.lanePosition + 0.3) {
+                                        b.ref.distance = maxDist;
+                                    }
+                                }
+                                // Note: We don't block the user's distance as it's controlled by treadmill pace
+                            } else if (!aAhead && aOnInside) {
+                                // B is ahead, A is on inside trying to pass - block A
+                                if (!a.isUser) {
+                                    const maxDist = b.distance - 0.3;
+                                    if (a.ref.distance > maxDist && a.lanePosition <= b.lanePosition + 0.3) {
+                                        a.ref.distance = maxDist;
+                                    }
                                 }
                             }
                         }
