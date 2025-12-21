@@ -1372,9 +1372,12 @@
                         }
 
                         // BLOCKING: Prevent passing on the inside (left)
+                        // Only apply after the first 50m to allow clean start from staggered lanes
                         // If someone behind is on the inside, they can't pass - must slow down or go around
                         const blockingThreshold = 1.0; // meters - blocking zone
-                        if (distanceDiff < blockingThreshold) {
+                        const raceHasProgressed = a.distance > 50 && b.distance > 50;
+
+                        if (distanceDiff < blockingThreshold && raceHasProgressed) {
                             if (aAhead && !aOnInside) {
                                 // A is ahead, B is on inside trying to pass - block B
                                 if (!b.isUser) {
