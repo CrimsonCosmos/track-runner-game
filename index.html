@@ -1222,10 +1222,10 @@
                 const pos = getTrackPosition(runner.distance, runner.lanePosition);
                 runner.model.position.set(pos.x, 0, pos.z);
 
-                // Calculate forward direction by looking ahead on track (like camera does)
-                const lookAheadDist = 1.0;
-                const aheadPos = getTrackPosition(runner.distance + lookAheadDist, runner.lanePosition);
-                const forwardAngle = Math.atan2(aheadPos.x - pos.x, aheadPos.z - pos.z);
+                // Calculate forward direction using lane 1 path (stable reference)
+                const refPos = getTrackPosition(runner.distance, 1.0);
+                const refAhead = getTrackPosition(runner.distance + 0.5, 1.0);
+                const forwardAngle = Math.atan2(refAhead.x - refPos.x, refAhead.z - refPos.z);
                 runner.model.rotation.y = forwardAngle;
 
                 // Update animation (speed matches running speed)
