@@ -1361,7 +1361,7 @@
                 const refPos = getTrackPosition(runner.distance, 1.0);
                 const refAhead = getTrackPosition(runner.distance + 0.5, 1.0);
                 const forwardAngle = Math.atan2(refAhead.x - refPos.x, refAhead.z - refPos.z);
-                runner.model.rotation.y = forwardAngle + Math.PI; // Add 180° to face correct direction
+                runner.model.rotation.y = forwardAngle;
 
                 // Update animation (speed matches running speed)
                 if (runner.mixer) {
