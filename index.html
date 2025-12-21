@@ -1180,31 +1180,36 @@
                 // LANE JOCKEYING LOGIC
                 // ============================================
 
-                const RUNNER_SPACING = 0.5; // lanes between runners when side-by-side (tighter packing)
+                // Only spread out if another runner is at NEARLY THE SAME distance
+                // (truly side-by-side, not just in a line)
+                const OVERLAP_THRESHOLD = 0.5; // meters - must be THIS close to force spreading
+                const RUNNER_SPACING = 0.4; // lanes between overlapping runners
 
-                // Sort all runners by distance to determine pack order
-                const sortedByDistance = [...aiRunners].sort((a, b) => b.distance - a.distance);
-                const myRank = sortedByDistance.indexOf(runner); // 0 = leader
+                // Count runners who are at nearly the same distance AND to my inside
+                let runnersBlockingInside = 0;
 
-                // Find runners ahead of me that are within pack threshold
-                let runnersAheadInPack = 0;
-                for (let i = 0; i < myRank; i++) {
-                    const aheadRunner = sortedByDistance[i];
-                    const gap = aheadRunner.distance - runner.distance;
-                    if (gap <= SIDE_BY_SIDE_THRESHOLD) {
-                        runnersAheadInPack++;
+                for (const other of aiRunners) {
+                    if (other === runner) continue;
+
+                    // Check if they're at nearly the same distance (truly side-by-side)
+                    const distanceDiff = Math.abs(runner.distance - other.distance);
+                    if (distanceDiff > OVERLAP_THRESHOLD) continue; // Not overlapping, ignore
+
+                    // They're at same distance - check if they're to my inside
+                    if (other.lanePosition < runner.lanePosition - 0.1) {
+                        runnersBlockingInside++;
                     }
                 }
 
-                // Target lane: lane 1 + offset for each runner ahead in the pack
+                // Target lane: lane 1 unless someone is blocking my inside at same distance
                 const targetLanePosition = Math.min(
-                    MIN_LANE_POSITION + (runnersAheadInPack * RUNNER_SPACING),
+                    MIN_LANE_POSITION + (runnersBlockingInside * RUNNER_SPACING),
                     MAX_LANE_POSITION
                 );
 
                 // Smoothly move toward target position
                 if (runner.lanePosition < targetLanePosition - 0.02) {
-                    // Need to move right (blocked by runners ahead)
+                    // Need to move right (someone blocking inside)
                     const pushAmount = PUSH_RIGHT_SPEED * delta;
                     runner.lanePosition = Math.min(runner.lanePosition + pushAmount, MAX_LANE_POSITION);
                 } else if (runner.lanePosition > targetLanePosition + 0.02) {
