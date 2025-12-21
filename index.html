@@ -428,7 +428,7 @@
             for (let lane = 0; lane <= NUM_LANES; lane++) {
                 const radius = INNER_RADIUS + (lane * LANE_WIDTH);
                 const halfStraight = STRAIGHT_LENGTH / 2;
-                const curveSegments = 32;
+                const curveSegments = 128; // More segments for smoother circular curves
 
                 // Right curve
                 for (let i = 0; i < curveSegments; i++) {
