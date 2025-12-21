@@ -1136,6 +1136,24 @@
                 const userSpeed = paceToSpeed(userPaceMinPerMile);
                 userDistance += userSpeed * delta;
 
+                // User lane jockeying - drift to lane 1 if no one blocking on left
+                let userBlocked = false;
+                for (const runner of aiRunners) {
+                    const distanceDiff = Math.abs(userDistance - runner.distance);
+                    if (distanceDiff < 1.5) {
+                        // Check if runner is to our left (inside)
+                        if (runner.lanePosition < userLanePosition - 0.1) {
+                            userBlocked = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Drift toward lane 1 if not blocked
+                if (!userBlocked && userLanePosition > MIN_LANE_POSITION) {
+                    userLanePosition = Math.max(userLanePosition - DRIFT_LEFT_SPEED * delta, MIN_LANE_POSITION);
+                }
+
                 // Get position on track
                 const userPos = getTrackPosition(userDistance, userLanePosition);
 
