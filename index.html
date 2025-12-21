@@ -329,6 +329,71 @@
 
         scene.add(createLaneMarkings());
 
+        // ============================================
+        // RACE CLOCK DISPLAY
+        // ============================================
+
+        // Create canvas for 8-bit style clock
+        const clockCanvas = document.createElement('canvas');
+        clockCanvas.width = 256;
+        clockCanvas.height = 64;
+        const clockCtx = clockCanvas.getContext('2d');
+
+        function updateClockDisplay(timeInSeconds) {
+            // Clear canvas with dark background
+            clockCtx.fillStyle = '#111111';
+            clockCtx.fillRect(0, 0, 256, 64);
+
+            // Format time as MM:SS.HH
+            const minutes = Math.floor(timeInSeconds / 60);
+            const seconds = Math.floor(timeInSeconds % 60);
+            const hundredths = Math.floor((timeInSeconds * 100) % 100);
+            const timeStr = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${hundredths.toString().padStart(2, '0')}`;
+
+            // Draw 8-bit style red text
+            clockCtx.font = 'bold 48px "Courier New", monospace';
+            clockCtx.fillStyle = '#ff0000';
+            clockCtx.textAlign = 'center';
+            clockCtx.textBaseline = 'middle';
+
+            // Add slight glow effect
+            clockCtx.shadowColor = '#ff0000';
+            clockCtx.shadowBlur = 8;
+            clockCtx.fillText(timeStr, 128, 32);
+
+            // Draw again for brightness
+            clockCtx.shadowBlur = 0;
+            clockCtx.fillText(timeStr, 128, 32);
+
+            clockTexture.needsUpdate = true;
+        }
+
+        const clockTexture = new THREE.CanvasTexture(clockCanvas);
+        clockTexture.minFilter = THREE.NearestFilter;
+        clockTexture.magFilter = THREE.NearestFilter;
+
+        const clockMaterial = new THREE.MeshBasicMaterial({
+            map: clockTexture,
+            transparent: true,
+            side: THREE.DoubleSide
+        });
+
+        const clockGeometry = new THREE.PlaneGeometry(6, 1.5);
+        const clockMesh = new THREE.Mesh(clockGeometry, clockMaterial);
+
+        // Position to the left of finish line, floating above track
+        clockMesh.position.set(
+            -STRAIGHT_LENGTH / 4 - 8,  // Left of finish line
+            4,                          // Floating height
+            -(INNER_RADIUS + TRACK_WIDTH / 2)  // Same z as finish line
+        );
+        clockMesh.rotation.y = Math.PI / 2; // Face the track
+
+        scene.add(clockMesh);
+
+        // Initialize display
+        updateClockDisplay(0);
+
         // Infield
         function createInfield() {
             const shape = new THREE.Shape();
@@ -714,6 +779,9 @@
             raceStarted = true;
             raceTime = 0;
 
+            // Reset clock display
+            updateClockDisplay(0);
+
             // Update UI
             document.getElementById('startButton').textContent = 'RACE IN PROGRESS';
             document.getElementById('startButton').disabled = true;
@@ -775,6 +843,9 @@
             // Update race time
             if (raceStarted) {
                 raceTime += delta;
+
+                // Update 3D clock display
+                updateClockDisplay(raceTime);
 
                 // Update race info display
                 const minutes = Math.floor(raceTime / 60);
