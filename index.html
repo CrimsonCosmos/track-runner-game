@@ -81,9 +81,96 @@
             z-index: 100;
             display: none;
         }
+        #goalTimeModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+        }
+        #goalTimeForm {
+            background: #222;
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        #goalTimeForm h2 {
+            margin: 0 0 20px 0;
+            font-size: 28px;
+        }
+        #goalTimeForm p {
+            margin: 10px 0;
+            color: #aaa;
+            font-size: 14px;
+        }
+        #goalTimeInput {
+            font-size: 32px;
+            padding: 15px 20px;
+            width: 180px;
+            text-align: center;
+            border: 2px solid #444;
+            border-radius: 8px;
+            background: #111;
+            color: #fff;
+            font-family: 'Courier New', monospace;
+            margin: 20px 0;
+        }
+        #goalTimeInput:focus {
+            outline: none;
+            border-color: #22cc22;
+        }
+        #goalTimeSubmit {
+            padding: 15px 40px;
+            font-size: 18px;
+            font-weight: bold;
+            background: #22cc22;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+        #goalTimeSubmit:hover {
+            background: #1ea01e;
+        }
+        #treadmillMessage {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 24px;
+            text-align: center;
+            background: rgba(0,0,0,0.8);
+            padding: 30px 50px;
+            border-radius: 12px;
+            z-index: 150;
+            display: none;
+        }
     </style>
 </head>
 <body>
+    <div id="goalTimeModal">
+        <div id="goalTimeForm">
+            <h2>🏃 5K Treadmill Race</h2>
+            <p>Enter your goal time for this session</p>
+            <input type="text" id="goalTimeInput" placeholder="MM:SS" maxlength="8">
+            <p>Format: MM:SS (e.g., 25:00 for 25 minutes)</p>
+            <button id="goalTimeSubmit">SET GOAL</button>
+        </div>
+    </div>
+    <div id="treadmillMessage">
+        Get your treadmill to desired speed,<br>then press <strong>'Play'</strong>!
+    </div>
     <div id="info">
         <strong>5K Track Race</strong><br><br>
         WASD - Move<br>
@@ -92,7 +179,7 @@
         Click to enable controls
     </div>
     <div id="loading">Loading runners...</div>
-    <button id="startButton">START RACE</button>
+    <button id="startButton" style="display: none;">PLAY</button>
     <div id="raceInfo"></div>
 
     <script type="importmap">
@@ -570,6 +657,8 @@
         const aiRunners = []; // Will hold runner data
         let raceStarted = false;
         let raceTime = 0;
+        let timeScaleFactor = 1.0; // Will be set based on user's goal time
+        let userGoalTime = 0; // User's goal time in seconds
 
         // Budapest 2023 World Championships 5000m Final - Top 7 splits
         // Each runner has 1000m split times (cumulative) and final time
@@ -637,12 +726,15 @@
             const timeAtEnd = splits[segmentIndex];
             const segmentTime = timeAtEnd - timeAtStart;
 
-            // Speed for this segment (m/s)
-            return 1000 / segmentTime;
+            // Speed for this segment (m/s), scaled by user's goal time
+            // Divide by timeScaleFactor to slow down proportionally
+            return (1000 / segmentTime) / timeScaleFactor;
         }
 
-        // Cooldown speed after finishing (half of average race pace)
-        const COOLDOWN_SPEED = 5000 / 791.3 / 2; // ~3.16 m/s
+        // Cooldown speed after finishing (half of average race pace, scaled)
+        function getCooldownSpeed() {
+            return (5000 / 791.3 / 2) / timeScaleFactor;
+        }
 
         // Colors for AI runners (lanes 2-8)
         const runnerColors = [
@@ -967,7 +1059,7 @@
 
                 // Calculate target speed based on splits
                 if (runner.finished) {
-                    runner.targetSpeed = COOLDOWN_SPEED;
+                    runner.targetSpeed = getCooldownSpeed();
                 } else {
                     runner.targetSpeed = getTargetSpeed(runner.raceData, runner.distance);
                 }
@@ -1080,6 +1172,73 @@
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        // ============================================
+        // GOAL TIME INPUT HANDLING
+        // ============================================
+
+        const ORIGINAL_WINNER_TIME = 791.3; // Ingebrigtsen's winning time in seconds
+
+        function parseTimeInput(input) {
+            // Parse MM:SS or M:SS format
+            const parts = input.trim().split(':');
+            if (parts.length === 2) {
+                const minutes = parseInt(parts[0], 10);
+                const seconds = parseInt(parts[1], 10);
+                if (!isNaN(minutes) && !isNaN(seconds)) {
+                    return minutes * 60 + seconds;
+                }
+            }
+            // Try parsing as just seconds
+            const totalSeconds = parseInt(input, 10);
+            if (!isNaN(totalSeconds)) {
+                return totalSeconds;
+            }
+            return null;
+        }
+
+        function formatTime(seconds) {
+            const mins = Math.floor(seconds / 60);
+            const secs = Math.floor(seconds % 60);
+            return `${mins}:${secs.toString().padStart(2, '0')}`;
+        }
+
+        document.getElementById('goalTimeSubmit').addEventListener('click', () => {
+            const input = document.getElementById('goalTimeInput').value;
+            const goalSeconds = parseTimeInput(input);
+
+            if (goalSeconds === null || goalSeconds < 600 || goalSeconds > 3600) {
+                alert('Please enter a valid time between 10:00 and 60:00');
+                return;
+            }
+
+            userGoalTime = goalSeconds;
+
+            // Calculate scale factor so winner finishes 10 seconds before goal
+            const winnerTargetTime = goalSeconds - 10;
+            timeScaleFactor = winnerTargetTime / ORIGINAL_WINNER_TIME;
+
+            console.log(`Goal time: ${formatTime(goalSeconds)}, Winner target: ${formatTime(winnerTargetTime)}, Scale factor: ${timeScaleFactor.toFixed(3)}`);
+
+            // Hide modal, show treadmill message
+            document.getElementById('goalTimeModal').style.display = 'none';
+            document.getElementById('treadmillMessage').style.display = 'block';
+            document.getElementById('startButton').style.display = 'block';
+        });
+
+        // Handle Enter key in input
+        document.getElementById('goalTimeInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                document.getElementById('goalTimeSubmit').click();
+            }
+        });
+
+        // Update start button to hide treadmill message when clicked
+        const originalStartRace = startRace;
+        startRace = function() {
+            document.getElementById('treadmillMessage').style.display = 'none';
+            originalStartRace();
+        };
 
     </script>
 </body>
