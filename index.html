@@ -1365,9 +1365,11 @@
 
                 // Update animation (speed matches running speed)
                 if (runner.mixer) {
-                    // Scale animation speed based on current speed (base ~6.3 m/s = normal animation)
-                    const animationScale = runner.currentSpeed / 6.3;
-                    runner.mixer.update(delta * Math.max(0.5, animationScale));
+                    // Scale animation speed: 10:00 5K pace (8.33 m/s) = normal animation speed
+                    // 20:00 5K pace (4.17 m/s) = half animation speed
+                    const BASE_ANIMATION_SPEED = 5000 / 600; // 10:00 5K = 8.33 m/s
+                    const animationScale = runner.currentSpeed / BASE_ANIMATION_SPEED;
+                    runner.mixer.update(delta * Math.max(0.3, animationScale));
                 }
             }
 
