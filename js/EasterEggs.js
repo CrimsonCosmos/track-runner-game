@@ -1,5 +1,5 @@
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-import { getTrackPosition } from './Track.js';
+import { getTrackPosition, getTrackLength } from './Track.js';
 
 // Celica GTO Easter Egg
 export const CELICA_TRIGGER_DISTANCE = 400; // Appears when leader hits 400m
@@ -12,7 +12,9 @@ export class CelicaEasterEgg {
         this.model = null;
         this.active = false;
         this.distance = 0;
+        this.startDistance = 0; // Track where car started
         this.triggered = false;
+        this.lapLength = 0;
     }
 
     load() {
@@ -40,6 +42,7 @@ export class CelicaEasterEgg {
     reset() {
         this.triggered = false;
         this.active = false;
+        this.startDistance = 0;
         if (this.model) {
             this.model.visible = false;
         }
@@ -51,8 +54,10 @@ export class CelicaEasterEgg {
         this.triggered = true;
         this.active = true;
         this.distance = leaderDistance - 50; // Start 50m behind leader
+        this.startDistance = this.distance; // Remember where we started
+        this.lapLength = getTrackLength(CELICA_LANE); // ~400m for a lap
         this.model.visible = true;
-        console.log('🚗 CELICA INCOMING!');
+        console.log('🚗 CELICA INCOMING! Starting at ' + this.distance.toFixed(0) + 'm, will drive for ' + this.lapLength.toFixed(0) + 'm');
     }
 
     update(delta, aiRunners) {
@@ -80,12 +85,12 @@ export class CelicaEasterEgg {
             }
         }
 
-        // Disappear after passing everyone by 100m
-        const maxRunnerDist = Math.max(...aiRunners.map(r => r.distance));
-        if (this.distance > maxRunnerDist + 100) {
+        // Disappear after completing a full lap
+        const distanceTraveled = this.distance - this.startDistance;
+        if (distanceTraveled >= this.lapLength) {
             this.model.visible = false;
             this.active = false;
-            console.log('🚗 Celica disappeared into the distance...');
+            console.log('🚗 Celica completed its lap and drove off!');
         }
     }
 
