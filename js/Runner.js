@@ -67,6 +67,7 @@ export class Runner {
         this.distance = 0;
         this.finished = false;
         this.squished = false;
+        this.squishTimer = 0;
         this.raceData = raceData;
         this.currentSpeed = 0;
         this.targetSpeed = 0;
@@ -98,6 +99,7 @@ export class Runner {
         this.lanePosition = lanePosition;
         this.finished = false;
         this.squished = false;
+        this.squishTimer = 0;
         this.currentSpeed = 0;
         this.model.scale.setScalar(0.01);
 
@@ -111,7 +113,18 @@ export class Runner {
     }
 
     update(delta, timeScaleFactor, allRunners, raceDistance) {
-        if (this.squished) return;
+        // Handle squished recovery
+        if (this.squished) {
+            this.squishTimer -= delta;
+            if (this.squishTimer <= 0) {
+                // Pop back up!
+                this.squished = false;
+                this.model.scale.setScalar(0.01);
+                this.model.position.y = 0;
+                if (this.action) this.action.paused = false;
+                console.log(`${this.raceData.name} popped back up!`);
+            }
+        }
 
         // Check if finished
         if (!this.finished && this.distance >= raceDistance) {
@@ -140,16 +153,17 @@ export class Runner {
         // Lane jockeying
         this.updateLanePosition(delta, allRunners);
 
-        // Update position
+        // Update position (keep squished runners on ground)
         const pos = getTrackPosition(this.distance, this.lanePosition);
-        this.model.position.set(pos.x, 0, pos.z);
+        const yPos = this.squished ? 0.01 : 0;
+        this.model.position.set(pos.x, yPos, pos.z);
 
         // Face forward
         const aheadPos = getTrackPosition(this.distance + 2, this.lanePosition);
         this.model.lookAt(aheadPos.x, 0, aheadPos.z);
 
-        // Update animation
-        if (this.mixer) {
+        // Update animation (but not while squished)
+        if (this.mixer && !this.squished) {
             const BASE_ANIMATION_SPEED = 5000 / 600;
             const animationScale = this.currentSpeed / BASE_ANIMATION_SPEED;
             this.mixer.update(delta * Math.max(0.3, animationScale) * this.strideMultiplier);
@@ -189,7 +203,9 @@ export class Runner {
     }
 
     squish() {
+        if (this.squished) return; // Already squished
         this.squished = true;
+        this.squishTimer = 2.0; // Pop back up after 2 seconds
         this.model.scale.y = 0.001;
         this.model.position.y = 0.01;
         if (this.action) this.action.paused = true;
