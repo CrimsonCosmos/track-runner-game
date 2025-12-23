@@ -318,10 +318,10 @@
         import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
         import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
 
-        // Scene setup - 10 PM night race atmosphere
+        // Scene setup - daytime
         const scene = new THREE.Scene();
-        scene.background = new THREE.Color(0x0a0a1a); // Dark night sky
-        scene.fog = new THREE.Fog(0x0a0a1a, 80, 300); // Dark fog for night atmosphere
+        scene.background = new THREE.Color(0x87CEEB); // Light blue sky
+        scene.fog = new THREE.Fog(0x87CEEB, 100, 400); // Light atmospheric fog
 
         // Camera
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -336,56 +336,23 @@
         renderer.toneMappingExposure = 1.0;
         document.body.appendChild(renderer.domElement);
 
-        // Lighting - 10 PM stadium lights
-        const ambientLight = new THREE.AmbientLight(0x1a1a2e, 0.3); // Dim ambient for night
+        // Lighting - daytime sunlight
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
         scene.add(ambientLight);
 
-        // Dim moonlight from above
-        const moonLight = new THREE.DirectionalLight(0x4466aa, 0.2);
-        moonLight.position.set(20, 100, 30);
-        scene.add(moonLight);
-
-        // Stadium lights - bright white spotlights around the track
-        const stadiumLightColor = 0xfffaf0; // Warm white stadium lights
-        const stadiumLightIntensity = 1.5;
-
-        // Create stadium light poles with spotlights
-        function createStadiumLight(x, z, targetX, targetZ) {
-            // Light pole (simple cylinder)
-            const poleGeom = new THREE.CylinderGeometry(0.3, 0.4, 25, 8);
-            const poleMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.8 });
-            const pole = new THREE.Mesh(poleGeom, poleMat);
-            pole.position.set(x, 12.5, z);
-            scene.add(pole);
-
-            // Light housing
-            const housingGeom = new THREE.BoxGeometry(3, 1, 2);
-            const housingMat = new THREE.MeshStandardMaterial({ color: 0x222222 });
-            const housing = new THREE.Mesh(housingGeom, housingMat);
-            housing.position.set(x, 25, z);
-            scene.add(housing);
-
-            // Spotlight
-            const spotlight = new THREE.SpotLight(stadiumLightColor, stadiumLightIntensity);
-            spotlight.position.set(x, 25, z);
-            spotlight.target.position.set(targetX, 0, targetZ);
-            spotlight.angle = Math.PI / 4;
-            spotlight.penumbra = 0.3;
-            spotlight.decay = 1;
-            spotlight.distance = 150;
-            spotlight.castShadow = true;
-            spotlight.shadow.mapSize.width = 1024;
-            spotlight.shadow.mapSize.height = 1024;
-            scene.add(spotlight);
-            scene.add(spotlight.target);
-
-            // Light glow effect
-            const glowGeom = new THREE.SphereGeometry(0.5, 8, 8);
-            const glowMat = new THREE.MeshBasicMaterial({ color: 0xffffcc });
-            const glow = new THREE.Mesh(glowGeom, glowMat);
-            glow.position.set(x, 24.5, z);
-            scene.add(glow);
-        }
+        // Sunlight from above
+        const sunLight = new THREE.DirectionalLight(0xffffd0, 1.2);
+        sunLight.position.set(50, 100, 30);
+        sunLight.castShadow = true;
+        sunLight.shadow.mapSize.width = 2048;
+        sunLight.shadow.mapSize.height = 2048;
+        sunLight.shadow.camera.near = 10;
+        sunLight.shadow.camera.far = 300;
+        sunLight.shadow.camera.left = -100;
+        sunLight.shadow.camera.right = 100;
+        sunLight.shadow.camera.top = 100;
+        sunLight.shadow.camera.bottom = -100;
+        scene.add(sunLight);
 
         // ============================================
         // TRACK GEOMETRY CONSTANTS
@@ -396,24 +363,8 @@
         const NUM_LANES = 8;
         const TRACK_WIDTH = LANE_WIDTH * NUM_LANES;
 
-        // Place stadium lights around the track (outside the outer lane)
-        const lightRadius = INNER_RADIUS + TRACK_WIDTH + 15;
-        const halfStraight = STRAIGHT_LENGTH / 2;
-
-        // Lights along straights
-        createStadiumLight(-halfStraight + 20, -lightRadius, 0, -INNER_RADIUS - TRACK_WIDTH/2);
-        createStadiumLight(halfStraight - 20, -lightRadius, 0, -INNER_RADIUS - TRACK_WIDTH/2);
-        createStadiumLight(-halfStraight + 20, lightRadius, 0, INNER_RADIUS + TRACK_WIDTH/2);
-        createStadiumLight(halfStraight - 20, lightRadius, 0, INNER_RADIUS + TRACK_WIDTH/2);
-
-        // Lights at curves
-        createStadiumLight(-halfStraight - 20, -lightRadius + 30, -halfStraight, 0);
-        createStadiumLight(-halfStraight - 20, lightRadius - 30, -halfStraight, 0);
-        createStadiumLight(halfStraight + 20, -lightRadius + 30, halfStraight, 0);
-        createStadiumLight(halfStraight + 20, lightRadius - 30, halfStraight, 0);
-
-        // Hemisphere light for subtle sky/ground color bleed
-        const hemiLight = new THREE.HemisphereLight(0x1a1a3a, 0x0a0a0a, 0.2);
+        // Hemisphere light for sky/ground color bleed
+        const hemiLight = new THREE.HemisphereLight(0x87CEEB, 0x3d5c3d, 0.4);
         scene.add(hemiLight);
 
         function createTrackTexture() {
@@ -809,7 +760,7 @@
         let isDragging = false;
         let lookOffsetX = 0; // Horizontal look offset (yaw)
         let lookOffsetY = 0; // Vertical look offset (pitch)
-        const MAX_LOOK_OFFSET_X = Math.PI / 2; // Max 90 degrees left/right
+        const MAX_LOOK_OFFSET_X = Math.PI; // Max 180 degrees left/right
         const MAX_LOOK_OFFSET_Y = Math.PI / 4; // Max 45 degrees up/down
         const SNAP_BACK_SPEED = 8; // How fast view snaps back
 
@@ -825,7 +776,7 @@
 
         document.addEventListener('mousemove', (e) => {
             if (isDragging && raceStarted) {
-                lookOffsetX -= e.movementX * 0.003;
+                lookOffsetX += e.movementX * 0.003;
                 lookOffsetY -= e.movementY * 0.003;
 
                 // Clamp offsets
@@ -939,8 +890,8 @@
 
         // Lane positioning constants
         const SIDE_BY_SIDE_THRESHOLD = 0.8; // meters - only spread if VERY close (nearly overlapping)
-        const DRIFT_LEFT_SPEED = 5.0; // lanes per second - how fast runners drift toward lane 1
-        const PUSH_RIGHT_SPEED = 8.0; // lanes per second - how fast runners get pushed out
+        const DRIFT_LEFT_SPEED = 0.15; // lanes per second - how fast runners drift toward lane 1
+        const PUSH_RIGHT_SPEED = 0.225; // lanes per second - how fast runners get pushed out
         const MIN_LANE_POSITION = 0.75; // inside of lane 1 (adjusted to keep feet in lane)
         const MAX_LANE_POSITION = 2.0; // can be pushed into lane 2 area
         const RUNNER_WIDTH = 0.5; // approximate width of a runner in meters
@@ -1049,6 +1000,13 @@
                         aiAction.paused = true; // Start paused until race begins
                     }
 
+                    // Random stride multiplier (0.85-1.15) - affects animation speed
+                    // Higher = shorter strides, more steps per minute
+                    const strideMultiplier = 0.85 + Math.random() * 0.3;
+
+                    // Random animation offset (0-1 seconds) to desync footsteps
+                    const animationOffset = Math.random();
+
                     aiRunners.push({
                         model: aiModel,
                         mixer: aiMixer,
@@ -1059,7 +1017,9 @@
                         finished: false,
                         raceData: shuffledRaceData[i],
                         currentSpeed: 0,
-                        targetSpeed: 0
+                        targetSpeed: 0,
+                        strideMultiplier: strideMultiplier,
+                        animationOffset: animationOffset
                     });
                 }
 
@@ -1080,6 +1040,86 @@
                 document.getElementById('loading').textContent = 'Error loading. Run: python3 -m http.server 8000';
             }
         );
+
+        // ============================================
+        // EASTER EGG: CELICA GTO CAR
+        // ============================================
+
+        let celicaModel = null;
+        let celicaActive = false;
+        let celicaDistance = 0;
+        const CELICA_TRIGGER_DISTANCE = 400; // Appears when leader hits 400m (second lap start)
+        const CELICA_SPEED = 25; // m/s - fast!
+        const CELICA_LANE = 1.3; // Drives through lanes 1-2
+        let celicaTriggered = false;
+
+        // Load the Celica model
+        const celicaLoader = new FBXLoader();
+        celicaLoader.load(
+            'Celica_GTO.fbx',
+            (fbx) => {
+                celicaModel = fbx;
+                celicaModel.scale.setScalar(0.012); // Adjust scale as needed
+                celicaModel.visible = false;
+                scene.add(celicaModel);
+                console.log('Celica GTO loaded!');
+            },
+            undefined,
+            (error) => {
+                console.log('Celica model not loaded:', error);
+            }
+        );
+
+        function triggerCelica() {
+            if (!celicaModel || celicaTriggered) return;
+            celicaTriggered = true;
+            celicaActive = true;
+
+            // Start behind the pack
+            const leader = aiRunners.reduce((max, r) => r.distance > max.distance ? r : max, aiRunners[0]);
+            celicaDistance = leader.distance - 50; // Start 50m behind leader
+
+            celicaModel.visible = true;
+            console.log('🚗 CELICA INCOMING!');
+        }
+
+        function updateCelica(delta) {
+            if (!celicaActive || !celicaModel) return;
+
+            // Move the car forward FAST
+            celicaDistance += CELICA_SPEED * delta;
+
+            // Position on track
+            const pos = getTrackPosition(celicaDistance, CELICA_LANE);
+            celicaModel.position.set(pos.x, 0, pos.z);
+
+            // Face forward
+            const aheadPos = getTrackPosition(celicaDistance + 5, CELICA_LANE);
+            celicaModel.lookAt(aheadPos.x, 0, aheadPos.z);
+
+            // Check for runners to squish (in lanes 1-2.5)
+            for (const runner of aiRunners) {
+                if (runner.squished) continue;
+
+                const distDiff = Math.abs(celicaDistance - runner.distance);
+                if (distDiff < 2 && runner.lanePosition < 2.5) {
+                    // SQUISH!
+                    runner.squished = true;
+                    runner.model.scale.y = 0.001; // Flatten!
+                    runner.model.position.y = 0.01; // On the ground
+                    if (runner.action) runner.action.paused = true;
+                    console.log(`🚗💀 ${runner.raceData.name} got squished!`);
+                }
+            }
+
+            // Disappear after passing everyone by 100m
+            const maxRunnerDist = Math.max(...aiRunners.map(r => r.distance));
+            if (celicaDistance > maxRunnerDist + 100) {
+                celicaModel.visible = false;
+                celicaActive = false;
+                console.log('🚗 Celica disappeared into the distance...');
+            }
+        }
 
         // ============================================
         // PACE SLIDER / TREADMILL CONTROLS
@@ -1115,32 +1155,56 @@
         function startRace() {
             if (raceStarted) return;
 
-            // Reset all runners to start line
-            for (const runner of aiRunners) {
-                runner.distance = 0;
+            // Reset Celica Easter egg
+            celicaTriggered = false;
+            celicaActive = false;
+            if (celicaModel) celicaModel.visible = false;
+
+            // Formation: 2 runners wide, staggered behind user
+            // Row spacing ~1.5m apart, lanes around 1.0 and 1.8
+            const formation = [
+                { row: 0, laneOffset: 0.3 },   // Runner 1: row 0, slightly right of lane 1
+                { row: 0, laneOffset: 1.1 },   // Runner 2: row 0, lane 2 area
+                { row: 1, laneOffset: 0.0 },   // Runner 3: row 1, lane 1
+                { row: 1, laneOffset: 0.8 },   // Runner 4: row 1, between lanes
+                { row: 2, laneOffset: 0.3 },   // Runner 5: row 2
+                { row: 2, laneOffset: 1.1 },   // Runner 6: row 2
+                { row: 3, laneOffset: 0.5 },   // Runner 7: row 3, center
+            ];
+            const ROW_SPACING = 1.5; // meters between rows
+            const START_OFFSET = 8; // user starts 8m ahead of first row
+
+            // Reset all runners in formation behind user
+            for (let i = 0; i < aiRunners.length; i++) {
+                const runner = aiRunners[i];
+                const form = formation[i];
+
+                runner.distance = START_OFFSET - (form.row + 1) * ROW_SPACING;
                 runner.finished = false;
                 runner.currentSpeed = 0;
-                runner.lanePosition = runner.lane; // Start at assigned lane, will drift to lane 1 gradually
+                runner.lanePosition = 1.0 + form.laneOffset; // Start in formation
+                runner.squished = false; // Reset squished state
+                runner.model.scale.setScalar(0.01); // Reset scale
 
-                // Position at start line (use assigned lane for staggered start)
-                const startPos = getTrackPosition(0, runner.lane);
+                // Position at formation spot
+                const startPos = getTrackPosition(runner.distance, runner.lanePosition);
                 runner.model.position.set(startPos.x, 0, startPos.z);
-                runner.model.rotation.y = startPos.rotation;
 
-                // Unpause animation
+                // Unpause animation and apply random offset to desync footsteps
                 if (runner.action) {
                     runner.action.paused = false;
+                    runner.mixer.update(runner.animationOffset);
                 }
             }
 
             // Reset user (camera) to start line in lane 1
-            userDistance = 0;
+            userDistance = START_OFFSET;
             userLanePosition = 1.0;
-            const userStartPos = getTrackPosition(0, userLanePosition);
+            const userStartPos = getTrackPosition(userDistance, userLanePosition);
             camera.position.set(userStartPos.x, 1.7, userStartPos.z);
 
             // Look forward along track
-            const lookAheadPos = getTrackPosition(5, userLanePosition);
+            const lookAheadPos = getTrackPosition(userDistance + 5, userLanePosition);
             camera.lookAt(lookAheadPos.x, 1.7, lookAheadPos.z);
 
             // Start the race
@@ -1257,6 +1321,17 @@
                 updateClockDisplay(raceTime);
             }
 
+            // Check for Celica trigger (second lap)
+            if (raceStarted && aiRunners.length > 0 && !celicaTriggered) {
+                const leader = aiRunners.reduce((max, r) => r.distance > max.distance ? r : max, aiRunners[0]);
+                if (leader.distance >= CELICA_TRIGGER_DISTANCE) {
+                    triggerCelica();
+                }
+            }
+
+            // Update Celica
+            updateCelica(delta);
+
             // Update AI runners
             for (const runner of aiRunners) {
                 // Only move if race has started
@@ -1267,6 +1342,9 @@
                     }
                     continue;
                 }
+
+                // Skip squished runners
+                if (runner.squished) continue;
 
                 // Check if runner has finished the 5K race
                 if (!runner.finished && runner.distance >= RACE_DISTANCE) {
@@ -1305,70 +1383,56 @@
                 // LANE JOCKEYING LOGIC
                 // ============================================
 
-                // Check if any runner is nearby (to prevent drift when close to others)
-                const NEARBY_THRESHOLD = 1.5; // meters - don't drift if someone this close
-                let someoneNearby = false;
-                let runnersBlockingInside = 0;
+                // Check who's blocking us from drifting inside
+                let blockedByRunner = null;
+                let canDriftInside = true;
 
                 for (const other of aiRunners) {
                     if (other === runner) continue;
 
-                    const distanceDiff = Math.abs(runner.distance - other.distance);
+                    const distanceDiff = runner.distance - other.distance; // positive = we're ahead
+                    const laneDiff = runner.lanePosition - other.lanePosition; // positive = we're outside
 
-                    // Check if someone is nearby (for drift suppression)
-                    if (distanceDiff < NEARBY_THRESHOLD) {
-                        const posMe = getTrackPosition(runner.distance, runner.lanePosition);
-                        const posOther = getTrackPosition(other.distance, other.lanePosition);
-                        const dx = posOther.x - posMe.x;
-                        const dz = posOther.z - posMe.z;
-                        const worldDist = Math.sqrt(dx * dx + dz * dz);
-
-                        if (worldDist < COLLISION_RADIUS * 3) {
-                            someoneNearby = true;
+                    // Someone is blocking our inside if they're:
+                    // - To our inside (lower lane position)
+                    // - And truly alongside (within 0.5m of same distance)
+                    if (laneDiff > 0.3 && distanceDiff > -0.5 && distanceDiff < 0.5) {
+                        canDriftInside = false;
+                        if (!blockedByRunner || other.lanePosition < blockedByRunner.lanePosition) {
+                            blockedByRunner = other;
                         }
-                    }
-
-                    // Count runners blocking inside (at same distance)
-                    if (distanceDiff < 0.5 && other.lanePosition < runner.lanePosition - 0.1) {
-                        runnersBlockingInside++;
                     }
                 }
 
-                // Target lane: lane 1 unless someone is blocking
-                const RUNNER_SPACING = 0.4;
-                const targetLanePosition = Math.min(
-                    MIN_LANE_POSITION + (runnersBlockingInside * RUNNER_SPACING),
-                    MAX_LANE_POSITION
-                );
+                // If blocked, try to accelerate slightly to get ahead and claim inside
+                if (blockedByRunner && runner.lanePosition > MIN_LANE_POSITION + 0.5) {
+                    // Small speed boost (2%) to gradually get ahead of blocker
+                    runner.currentSpeed *= 1.0003;
+                }
 
-                // Only adjust lane position if NOT near another runner (prevents vibration)
-                if (!someoneNearby) {
-                    if (runner.lanePosition < targetLanePosition - 0.02) {
-                        const pushAmount = PUSH_RIGHT_SPEED * delta;
-                        runner.lanePosition = Math.min(runner.lanePosition + pushAmount, MAX_LANE_POSITION);
-                    } else if (runner.lanePosition > targetLanePosition + 0.02) {
-                        const driftAmount = DRIFT_LEFT_SPEED * delta;
-                        runner.lanePosition = Math.max(runner.lanePosition - driftAmount, MIN_LANE_POSITION);
-                    }
+                // Drift toward lane 1 if path is clear
+                // Drift scales with lane position: 8x faster in lane 8, 2x in lane 2, etc.
+                if (canDriftInside && runner.lanePosition > MIN_LANE_POSITION) {
+                    const driftMultiplier = runner.lanePosition;
+                    const driftAmount = DRIFT_LEFT_SPEED * delta * driftMultiplier;
+                    runner.lanePosition = Math.max(runner.lanePosition - driftAmount, MIN_LANE_POSITION);
                 }
 
                 // Get new position on track using dynamic lane position
                 const pos = getTrackPosition(runner.distance, runner.lanePosition);
                 runner.model.position.set(pos.x, 0, pos.z);
 
-                // Calculate forward direction using lane 1 path (stable reference)
-                const refPos = getTrackPosition(runner.distance, 1.0);
-                const refAhead = getTrackPosition(runner.distance + 0.5, 1.0);
-                const forwardAngle = Math.atan2(refAhead.x - refPos.x, refAhead.z - refPos.z);
-                runner.model.rotation.y = forwardAngle;
+                // Face forward along track (same method as camera)
+                const aheadPos = getTrackPosition(runner.distance + 2, runner.lanePosition);
+                runner.model.lookAt(aheadPos.x, 0, aheadPos.z);
 
-                // Update animation (speed matches running speed)
+                // Update animation (speed matches running speed, adjusted by stride multiplier)
                 if (runner.mixer) {
                     // Scale animation speed: 10:00 5K pace (8.33 m/s) = normal animation speed
-                    // 20:00 5K pace (4.17 m/s) = half animation speed
                     const BASE_ANIMATION_SPEED = 5000 / 600; // 10:00 5K = 8.33 m/s
                     const animationScale = runner.currentSpeed / BASE_ANIMATION_SPEED;
-                    runner.mixer.update(delta * Math.max(0.3, animationScale));
+                    // Apply stride multiplier: higher = shorter strides, faster leg turnover
+                    runner.mixer.update(delta * Math.max(0.3, animationScale) * runner.strideMultiplier);
                 }
             }
 
@@ -1441,32 +1505,31 @@
                             }
                         }
 
-                        // BLOCKING: Prevent passing on the inside (left)
-                        // Only apply after the first 50m to allow clean start from staggered lanes
-                        // If someone behind is on the inside, they can't pass - must slow down or go around
+                        // BLOCKING: Prevent AI runners from passing each other on the inside (left)
+                        // Only between AI runners - user must go around on outside, AI holds position
                         const blockingThreshold = 1.0; // meters - blocking zone
                         const raceHasProgressed = a.distance > 50 && b.distance > 50;
 
-                        if (distanceDiff < blockingThreshold && raceHasProgressed) {
+                        // Only apply blocking between two AI runners (not involving user)
+                        if (!a.isUser && !b.isUser && distanceDiff < blockingThreshold && raceHasProgressed) {
                             if (aAhead && !aOnInside) {
                                 // A is ahead, B is on inside trying to pass - block B
-                                if (!b.isUser) {
-                                    // Cap B's distance to not pass A on the inside
-                                    const maxDist = a.distance - 0.3; // Stay behind
-                                    if (b.ref.distance > maxDist && b.lanePosition <= a.lanePosition + 0.3) {
-                                        b.ref.distance = maxDist;
-                                    }
+                                const maxDist = a.distance - 0.3;
+                                if (b.ref.distance > maxDist && b.lanePosition <= a.lanePosition + 0.3) {
+                                    b.ref.distance = maxDist;
                                 }
-                                // Note: We don't block the user's distance as it's controlled by treadmill pace
                             } else if (!aAhead && aOnInside) {
                                 // B is ahead, A is on inside trying to pass - block A
-                                if (!a.isUser) {
-                                    const maxDist = b.distance - 0.3;
-                                    if (a.ref.distance > maxDist && a.lanePosition <= b.lanePosition + 0.3) {
-                                        a.ref.distance = maxDist;
-                                    }
+                                const maxDist = b.distance - 0.3;
+                                if (a.ref.distance > maxDist && a.lanePosition <= b.lanePosition + 0.3) {
+                                    a.ref.distance = maxDist;
                                 }
                             }
+                        }
+
+                        // User must go around on outside - push user outward if colliding
+                        if ((a.isUser || b.isUser) && dist < minDist) {
+                            userLanePosition = Math.min(userLanePosition + 0.1 * delta, MAX_LANE_POSITION + 1);
                         }
                     }
                 }
