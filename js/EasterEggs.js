@@ -1,10 +1,12 @@
+import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
-import { getTrackPosition, getTrackLength } from './Track.js';
+import { getPosition, getCurrentPathLength } from './Track.js';
 
 // Celica GTO Easter Egg
 export const CELICA_TRIGGER_DISTANCE = 400; // Appears when leader hits 400m
 export const CELICA_SPEED = 25; // m/s - fast!
-export const CELICA_LANE = 1.3; // Drives through lanes 1-2
+export const CELICA_LANE = 7.5; // Drives through outer lanes 7-8
+
 
 export class CelicaEasterEgg {
     constructor(scene) {
@@ -15,6 +17,8 @@ export class CelicaEasterEgg {
         this.startDistance = 0; // Track where car started
         this.triggered = false;
         this.lapLength = 0;
+        this.hasAppeared = false; // Track if car has become visible yet
+        this.lapComplete = false; // Track if lap is done
     }
 
     load() {
@@ -23,17 +27,26 @@ export class CelicaEasterEgg {
             loader.load(
                 'models/Celica_GTO.fbx',
                 (fbx) => {
+                    // Create a container group for the car
+                    this.container = new THREE.Group();
                     this.model = fbx;
-                    this.model.scale.setScalar(0.012);
-                    this.model.visible = false;
-                    this.scene.add(this.model);
-                    console.log('Celica GTO loaded!');
-                    resolve(this.model);
+
+                    // Fix the model's base rotation (nose was pointing down)
+                    this.model.rotation.x = -Math.PI / 2;
+                    this.model.scale.setScalar(1.0);
+
+                    this.container.add(this.model);
+                    this.container.visible = false;
+                    this.scene.add(this.container);
+
+                    resolve(this.container);
                 },
-                undefined,
+                (progress) => {
+                    // Silent progress
+                },
                 (error) => {
-                    console.log('Celica model not loaded:', error);
-                    resolve(null); // Don't reject, just continue without the easter egg
+                    console.log('Celica model not found');
+                    resolve(null);
                 }
             );
         });
@@ -43,54 +56,90 @@ export class CelicaEasterEgg {
         this.triggered = false;
         this.active = false;
         this.startDistance = 0;
-        if (this.model) {
-            this.model.visible = false;
+        this.hasAppeared = false;
+        this.lapComplete = false;
+        if (this.container) {
+            this.container.visible = false;
         }
     }
 
     trigger(leaderDistance) {
-        if (!this.model || this.triggered) return;
+        if (!this.container || this.triggered) return;
 
         this.triggered = true;
         this.active = true;
-        this.distance = leaderDistance - 50; // Start 50m behind leader
-        this.startDistance = this.distance; // Remember where we started
-        this.lapLength = getTrackLength(CELICA_LANE); // ~400m for a lap
-        this.model.visible = true;
-        console.log('🚗 CELICA INCOMING! Starting at ' + this.distance.toFixed(0) + 'm, will drive for ' + this.lapLength.toFixed(0) + 'm');
+        this.distance = leaderDistance - 50;
+        this.startDistance = this.distance;
+        this.lapLength = getCurrentPathLength(CELICA_LANE);
+        this.hasAppeared = false;
+        this.lapComplete = false;
+        // Don't make visible yet - wait until out of view
+        this.container.visible = false;
     }
 
-    update(delta, aiRunners) {
-        if (!this.active || !this.model) return;
+    // Check if a position is in the camera's view
+    isInCameraView(camera, position) {
+        const frustum = new THREE.Frustum();
+        const cameraViewProjectionMatrix = new THREE.Matrix4();
+
+        camera.updateMatrixWorld();
+        cameraViewProjectionMatrix.multiplyMatrices(
+            camera.projectionMatrix,
+            camera.matrixWorldInverse
+        );
+        frustum.setFromProjectionMatrix(cameraViewProjectionMatrix);
+
+        return frustum.containsPoint(position);
+    }
+
+    update(delta, aiRunners, camera) {
+        if (!this.active || !this.container) return;
 
         // Move the car forward FAST
         this.distance += CELICA_SPEED * delta;
 
-        // Position on track
-        const pos = getTrackPosition(this.distance, CELICA_LANE);
-        this.model.position.set(pos.x, 0, pos.z);
+        // Position on track/city
+        const pos = getPosition(this.distance, CELICA_LANE);
+        this.container.position.set(pos.x, 0, pos.z);
 
-        // Face forward
-        const aheadPos = getTrackPosition(this.distance + 5, CELICA_LANE);
-        this.model.lookAt(aheadPos.x, 0, aheadPos.z);
+        // Face forward (container rotates, model inside has fixed rotation)
+        const aheadPos = getPosition(this.distance + 5, CELICA_LANE);
+        this.container.lookAt(aheadPos.x, 0, aheadPos.z);
 
-        // Check for runners to squish
-        for (const runner of aiRunners) {
-            if (runner.squished) continue;
+        // Check if car is in camera view
+        const carPosition = new THREE.Vector3(pos.x, 1, pos.z);
+        const inView = this.isInCameraView(camera, carPosition);
 
-            const distDiff = Math.abs(this.distance - runner.distance);
-            if (distDiff < 2 && runner.lanePosition < 2.5) {
-                runner.squish();
-                console.log(`🚗💀 ${runner.raceData.name} got squished!`);
+        // Only appear when outside user's view
+        if (!this.hasAppeared) {
+            if (!inView) {
+                this.container.visible = true;
+                this.hasAppeared = true;
             }
         }
 
-        // Disappear after completing a full lap
+        // Check for runners to squish (only in outer lanes 6+)
+        if (this.container.visible) {
+            for (const runner of aiRunners) {
+                if (runner.squished) continue;
+
+                const distDiff = Math.abs(this.distance - runner.distance);
+                if (distDiff < 2 && runner.lanePosition > 6.0) {
+                    runner.squish();
+                }
+            }
+        }
+
+        // Check if lap is complete
         const distanceTraveled = this.distance - this.startDistance;
         if (distanceTraveled >= this.lapLength) {
-            this.model.visible = false;
+            this.lapComplete = true;
+        }
+
+        // Only disappear after lap complete AND out of view
+        if (this.lapComplete && !inView) {
+            this.container.visible = false;
             this.active = false;
-            console.log('🚗 Celica completed its lap and drove off!');
         }
     }
 
