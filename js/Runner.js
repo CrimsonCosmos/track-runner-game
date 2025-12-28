@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getTrackPosition } from './Track.js';
+import { getPosition } from './Track.js';
 
 // Lane positioning constants
 export const DRIFT_LEFT_SPEED = 0.15;
@@ -103,8 +103,9 @@ export class Runner {
         this.currentSpeed = 0;
         this.model.scale.setScalar(0.01);
 
-        const pos = getTrackPosition(this.distance, this.lanePosition);
-        this.model.position.set(pos.x, 0, pos.z);
+        const pos = getPosition(this.distance, this.lanePosition);
+        const groundY = pos.y || 0;
+        this.model.position.set(pos.x, groundY, pos.z);
 
         if (this.action) {
             this.action.paused = false;
@@ -154,13 +155,14 @@ export class Runner {
         this.updateLanePosition(delta, allRunners);
 
         // Update position (keep squished runners on ground)
-        const pos = getTrackPosition(this.distance, this.lanePosition);
-        const yPos = this.squished ? 0.01 : 0;
+        const pos = getPosition(this.distance, this.lanePosition);
+        const groundY = pos.y || 0;
+        const yPos = this.squished ? groundY + 0.01 : groundY;
         this.model.position.set(pos.x, yPos, pos.z);
 
         // Face forward
-        const aheadPos = getTrackPosition(this.distance + 2, this.lanePosition);
-        this.model.lookAt(aheadPos.x, 0, aheadPos.z);
+        const aheadPos = getPosition(this.distance + 2, this.lanePosition);
+        this.model.lookAt(aheadPos.x, aheadPos.y || 0, aheadPos.z);
 
         // Update animation (but not while squished)
         if (this.mixer && !this.squished) {

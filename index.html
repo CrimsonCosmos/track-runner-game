@@ -41,7 +41,7 @@
         }
         #startButton {
             position: absolute;
-            top: 20px;
+            top: 70px;
             right: 20px;
             padding: 15px 30px;
             font-size: 18px;
@@ -87,7 +87,7 @@
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.85);
+            background: #000000;
             display: flex;
             justify-content: center;
             align-items: center;
@@ -181,6 +181,86 @@
         #goalTimeSubmit:hover {
             background: #1ea01e;
         }
+        #viewSelectModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #000000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 300;
+        }
+        #viewSelectForm {
+            background: #222;
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        #viewSelectForm h2 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+        }
+        #viewSelectForm p {
+            margin: 0 0 20px 0;
+            color: #aaa;
+            font-size: 14px;
+        }
+        .view-select-options {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .view-select-option {
+            flex: 1;
+            padding: 20px 15px;
+            background: #333;
+            border: 2px solid #444;
+            border-radius: 12px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+            min-width: 100px;
+        }
+        .view-select-option:hover {
+            background: #3a3a3a;
+            transform: translateY(-2px);
+        }
+        .view-select-option.selected {
+            border-color: #22cc22;
+            background: #2a3a2a;
+        }
+        .view-select-option .view-option-icon {
+            font-size: 40px;
+            margin-bottom: 10px;
+        }
+        .view-select-option .view-option-name {
+            font-size: 16px;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .view-option-desc {
+            font-size: 11px;
+            color: #888;
+        }
+        #viewSelectSubmit {
+            padding: 15px 50px;
+            font-size: 18px;
+            font-weight: bold;
+            background: #22cc22;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #viewSelectSubmit:hover {
+            background: #1ea01e;
+        }
         #treadmillMessage {
             position: absolute;
             top: 50%;
@@ -261,6 +341,209 @@
             font-size: 11px;
             margin-top: 5px;
         }
+        #settingsButton {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 40px;
+            height: 40px;
+            background: rgba(0,0,0,0.7);
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.2s;
+        }
+        #settingsButton:hover {
+            background: rgba(50,50,50,0.9);
+        }
+        #settingsButton svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+        #settingsModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 400;
+        }
+        #settingsContent {
+            background: #222;
+            padding: 30px 40px;
+            border-radius: 16px;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            min-width: 300px;
+        }
+        #settingsContent h2 {
+            margin: 0 0 20px 0;
+            font-size: 24px;
+            text-align: center;
+        }
+        .settings-section {
+            margin: 15px 0;
+        }
+        .settings-section label {
+            display: block;
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .view-options {
+            display: flex;
+            gap: 10px;
+        }
+        .view-option {
+            flex: 1;
+            padding: 15px;
+            background: #333;
+            border: 2px solid #444;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            transition: all 0.2s;
+        }
+        .view-option:hover {
+            background: #3a3a3a;
+        }
+        .view-option.selected {
+            border-color: #22cc22;
+            background: #2a3a2a;
+        }
+        .view-option-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+        .view-option-name {
+            font-size: 14px;
+            font-weight: bold;
+        }
+        #settingsClose {
+            width: 100%;
+            margin-top: 20px;
+            padding: 12px;
+            font-size: 16px;
+            font-weight: bold;
+            background: #22cc22;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+        }
+        #settingsClose:hover {
+            background: #1ea01e;
+        }
+        #pathEditorOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            display: none;
+            z-index: 500;
+            pointer-events: none;
+        }
+        #pathEditorOverlay.active {
+            display: block;
+        }
+        #pathEditorHUD {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 20px;
+            border-radius: 12px;
+            font-family: 'Courier New', monospace;
+            pointer-events: auto;
+        }
+        #pathEditorHUD h3 {
+            margin: 0 0 15px 0;
+            color: #4488ff;
+        }
+        #pathEditorHUD .coords {
+            font-size: 18px;
+            margin: 10px 0;
+        }
+        #pathEditorHUD .instructions {
+            font-size: 12px;
+            color: #aaa;
+            margin-top: 15px;
+            line-height: 1.6;
+        }
+        #pathEditorHUD .point-count {
+            font-size: 16px;
+            color: #44ff44;
+            margin: 10px 0;
+        }
+        #finishPathEditor {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #44ff44;
+            color: black;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: bold;
+            pointer-events: auto;
+        }
+        #cancelPathEditor {
+            margin-top: 10px;
+            padding: 8px 15px;
+            background: #ff4444;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            pointer-events: auto;
+        }
+        #pathOutput {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #222;
+            padding: 30px;
+            border-radius: 12px;
+            max-width: 80%;
+            max-height: 80%;
+            overflow: auto;
+            z-index: 600;
+            display: none;
+        }
+        #pathOutput h3 {
+            color: #4488ff;
+            margin: 0 0 15px 0;
+        }
+        #pathOutput pre {
+            background: #111;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-size: 12px;
+            color: #44ff44;
+        }
+        #pathOutput button {
+            margin-top: 15px;
+            padding: 10px 20px;
+            background: #4488ff;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+        }
     </style>
 </head>
 <body>
@@ -286,8 +569,71 @@
             <button id="goalTimeSubmit">SET GOAL</button>
         </div>
     </div>
+    <div id="viewSelectModal" style="display: none;">
+        <div id="viewSelectForm">
+            <h2>Choose Your View</h2>
+            <p>Where do you want to run?</p>
+            <div class="view-select-options">
+                <div class="view-select-option selected" data-view="default">
+                    <div class="view-option-icon">🏟️</div>
+                    <div class="view-option-name">Track</div>
+                    <div class="view-option-desc">Classic oval track</div>
+                </div>
+                <div class="view-select-option" data-view="mountain">
+                    <div class="view-option-icon">🏔️</div>
+                    <div class="view-option-name">Mountain</div>
+                    <div class="view-option-desc">Scenic mountain view</div>
+                </div>
+                <div class="view-select-option" data-view="city">
+                    <div class="view-option-icon">🏙️</div>
+                    <div class="view-option-name">City</div>
+                    <div class="view-option-desc">NYC streets</div>
+                </div>
+                <div class="view-select-option" data-view="mountain_roads">
+                    <div class="view-option-icon">🛣️</div>
+                    <div class="view-option-name">Mtn Roads</div>
+                    <div class="view-option-desc">Winding mountain roads</div>
+                </div>
+            </div>
+            <button id="viewSelectSubmit">START</button>
+        </div>
+    </div>
     <div id="treadmillMessage">
         Get your treadmill to desired speed,<br>then press <strong>'Play'</strong>!
+    </div>
+    <button id="settingsButton">
+        <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
+    </button>
+    <div id="settingsModal">
+        <div id="settingsContent">
+            <h2>Settings</h2>
+            <div class="settings-section">
+                <label>Track View</label>
+                <div class="view-options">
+                    <div class="view-option selected" data-view="default">
+                        <div class="view-option-icon">🏟️</div>
+                        <div class="view-option-name">Default</div>
+                    </div>
+                    <div class="view-option" data-view="mountain">
+                        <div class="view-option-icon">🏔️</div>
+                        <div class="view-option-name">Mountain</div>
+                    </div>
+                    <div class="view-option" data-view="city">
+                        <div class="view-option-icon">🏙️</div>
+                        <div class="view-option-name">City</div>
+                    </div>
+                    <div class="view-option" data-view="mountain_roads">
+                        <div class="view-option-icon">🛣️</div>
+                        <div class="view-option-name">Mtn Roads</div>
+                    </div>
+                </div>
+            </div>
+            <div class="settings-section">
+                <label>Path Editor</label>
+                <button id="startPathEditor" style="width:100%; padding:12px; background:#4488ff; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Edit Map Path</button>
+            </div>
+            <button id="settingsClose">DONE</button>
+        </div>
     </div>
     <div id="info">
         <strong>5K Treadmill Race</strong><br><br>
@@ -302,6 +648,36 @@
         <input type="range" id="paceSlider" min="3" max="12" step="0.1" value="8">
         <div id="paceDisplay">8:00</div>
         <div id="paceUnit">min/mile</div>
+    </div>
+
+    <div id="pathEditorOverlay">
+        <div id="pathEditorHUD">
+            <h3>PATH EDITOR</h3>
+            <div class="coords">
+                X: <span id="editorX">0.00</span><br>
+                Y: <span id="editorY">0.00</span><br>
+                Z: <span id="editorZ">0.00</span>
+            </div>
+            <div class="point-count">
+                Points: <span id="pointCount">0</span>
+            </div>
+            <div class="instructions">
+                WASD / Arrows - Move camera<br>
+                Q/E - Move up/down<br>
+                Mouse - Look around (click to re-enable)<br>
+                SPACE - Add waypoint<br>
+                BACKSPACE - Undo last point
+            </div>
+            <button id="finishPathEditor">FINISH & EXPORT</button><br>
+            <button id="cancelPathEditor">Cancel</button>
+        </div>
+    </div>
+
+    <div id="pathOutput">
+        <h3>Exported Path Coordinates</h3>
+        <p style="color:#aaa; font-size:12px;">Copy this code and paste it into Track.js to replace CITY_WAYPOINTS:</p>
+        <pre id="pathCode"></pre>
+        <button id="closePathOutput">Close</button>
     </div>
 
     <script type="importmap">

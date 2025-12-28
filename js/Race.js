@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getTrackPosition } from './Track.js';
+import { getPosition } from './Track.js';
 import { COLLISION_RADIUS, COLLISION_PUSH_STRENGTH, MAX_LANE_POSITION } from './Runner.js';
 
 // Race constants
@@ -171,8 +171,8 @@ export function resolveCollisions(player, aiRunners, delta) {
 
             if (distanceDiff > 2.0 || laneDiff > 1.5) continue;
 
-            const posA = getTrackPosition(a.distance, a.lanePosition);
-            const posB = getTrackPosition(b.distance, b.lanePosition);
+            const posA = getPosition(a.distance, a.lanePosition);
+            const posB = getPosition(b.distance, b.lanePosition);
 
             const dx = posB.x - posA.x;
             const dz = posB.z - posA.z;
@@ -229,8 +229,9 @@ export function resolveCollisions(player, aiRunners, delta) {
 
     // Update AI runner positions after collision resolution
     for (const runner of aiRunners) {
-        const pos = getTrackPosition(runner.distance, runner.lanePosition);
-        runner.model.position.set(pos.x, 0, pos.z);
+        const pos = getPosition(runner.distance, runner.lanePosition);
+        const groundY = pos.y || 0;
+        runner.model.position.set(pos.x, groundY, pos.z);
     }
 
     // Update player position if pushed

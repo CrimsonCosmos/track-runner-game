@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getTrackPosition } from './Track.js';
+import { getPosition } from './Track.js';
 import { DRIFT_LEFT_SPEED, MIN_LANE_POSITION, MAX_LANE_POSITION } from './Runner.js';
 
 // Camera constants
@@ -42,7 +42,7 @@ export class Player {
         document.addEventListener('mousemove', (e) => {
             if (this.isDragging && this.raceActive) {
                 this.lookOffsetX += e.movementX * 0.003;
-                this.lookOffsetY -= e.movementY * 0.003;
+                this.lookOffsetY += e.movementY * 0.003;
 
                 // Clamp offsets
                 this.lookOffsetX = Math.max(-MAX_LOOK_OFFSET_X, Math.min(MAX_LOOK_OFFSET_X, this.lookOffsetX));
@@ -66,11 +66,13 @@ export class Player {
         this.lookOffsetX = 0;
         this.lookOffsetY = 0;
 
-        const pos = getTrackPosition(this.distance, this.lanePosition);
-        this.camera.position.set(pos.x, EYE_HEIGHT, pos.z);
+        const pos = getPosition(this.distance, this.lanePosition);
+        const groundY = pos.y || 0;
+        this.camera.position.set(pos.x, groundY + EYE_HEIGHT, pos.z);
 
-        const lookAheadPos = getTrackPosition(this.distance + 5, this.lanePosition);
-        this.camera.lookAt(lookAheadPos.x, EYE_HEIGHT, lookAheadPos.z);
+        const lookAheadPos = getPosition(this.distance + 5, this.lanePosition);
+        const lookGroundY = lookAheadPos.y || 0;
+        this.camera.lookAt(lookAheadPos.x, lookGroundY + EYE_HEIGHT, lookAheadPos.z);
     }
 
     update(delta, time, aiRunners) {
@@ -94,12 +96,13 @@ export class Player {
             this.lanePosition = Math.max(this.lanePosition - DRIFT_LEFT_SPEED * delta, MIN_LANE_POSITION);
         }
 
-        // Get position on track
-        const userPos = getTrackPosition(this.distance, this.lanePosition);
+        // Get position on track/city
+        const userPos = getPosition(this.distance, this.lanePosition);
+        const groundY = userPos.y || 0;
 
         // Calculate forward direction
         const lookAheadDist = 2;
-        const aheadPos = getTrackPosition(this.distance + lookAheadDist, this.lanePosition);
+        const aheadPos = getPosition(this.distance + lookAheadDist, this.lanePosition);
         const forwardDir = new THREE.Vector3(
             aheadPos.x - userPos.x,
             0,
@@ -109,7 +112,7 @@ export class Player {
         // Update camera position
         this.camera.position.x = userPos.x;
         this.camera.position.z = userPos.z;
-        this.camera.position.y = EYE_HEIGHT;
+        this.camera.position.y = groundY + EYE_HEIGHT;
 
         // Subtle head bob based on speed
         const bobSpeed = userSpeed * 2;
@@ -143,9 +146,11 @@ export class Player {
     }
 
     updatePosition() {
-        const userPos = getTrackPosition(this.distance, this.lanePosition);
+        const userPos = getPosition(this.distance, this.lanePosition);
+        const groundY = userPos.y || 0;
         this.camera.position.x = userPos.x;
         this.camera.position.z = userPos.z;
+        this.camera.position.y = groundY + EYE_HEIGHT;
     }
 }
 
