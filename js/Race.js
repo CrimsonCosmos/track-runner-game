@@ -1,11 +1,31 @@
 import * as THREE from 'three';
-import { getPosition } from './Track.js';
+import { getPosition, getTrackLength } from './Track.js';
 import { COLLISION_RADIUS, COLLISION_PUSH_STRENGTH, MAX_LANE_POSITION } from './Runner.js';
+import { RACE_MODES, RACE_MODE, getRaceDistance, getStaggerDistance } from './RaceConfig.js';
 
-// Race constants
+// Race constants (legacy - kept for backward compatibility)
 export const RACE_DISTANCE = 5000; // 5K race
 export const ORIGINAL_WINNER_TIME = 791.3; // Ingebrigtsen's winning time in seconds
 export const LAST_LAP_DISTANCE = 4800; // 12 laps completed, starting last lap
+
+// Get race distance based on current mode
+export function getRaceModeDistance(raceMode, lane = 1) {
+    if (!raceMode || raceMode === 'default') {
+        return RACE_DISTANCE; // Default 5K
+    }
+    return getRaceDistance(raceMode, lane);
+}
+
+// Calculate staggered start position for a lane
+export function getStaggeredStartDistance(lane, raceMode) {
+    if (!raceMode) return 0;
+
+    const config = RACE_MODES[raceMode];
+    if (!config || !config.staggeredStart) return 0;
+
+    // Outer lanes start ahead to compensate for longer distance
+    return getStaggerDistance(lane);
+}
 
 // Clock display
 let clockCanvas = null;
@@ -238,7 +258,7 @@ export function resolveCollisions(player, aiRunners, delta) {
     player.updatePosition();
 }
 
-// Formation for race start
+// Formation for race start (legacy 5K style - grouped start)
 export const RACE_FORMATION = [
     { row: 0, laneOffset: 0.3 },
     { row: 0, laneOffset: 1.1 },
@@ -251,6 +271,69 @@ export const RACE_FORMATION = [
 
 export const ROW_SPACING = 1.5;
 export const START_OFFSET = 8;
+
+// Lane-based formation for 400m/1600m (one runner per lane, staggered)
+// Lane 1 = innermost, Lane 8 = outermost
+export const LANE_FORMATION = [
+    { lane: 1, lanePosition: 0.75 },  // Player typically in lane 1
+    { lane: 2, lanePosition: 1.0 },
+    { lane: 3, lanePosition: 1.15 },
+    { lane: 4, lanePosition: 1.30 },
+    { lane: 5, lanePosition: 1.45 },
+    { lane: 6, lanePosition: 1.60 },
+    { lane: 7, lanePosition: 1.75 },
+    { lane: 8, lanePosition: 1.90 },
+];
+
+// Get formation based on race mode
+export function getFormation(raceMode) {
+    if (!raceMode) return { type: 'grouped', formation: RACE_FORMATION };
+
+    const config = RACE_MODES[raceMode];
+    if (!config) return { type: 'grouped', formation: RACE_FORMATION };
+
+    if (config.stayInLane) {
+        return { type: 'lanes', formation: LANE_FORMATION };
+    }
+
+    // 1600m uses waterfall start (staggered but breaks to lane 1)
+    if (raceMode === RACE_MODE.MILE_1600) {
+        return { type: 'waterfall', formation: LANE_FORMATION };
+    }
+
+    return { type: 'grouped', formation: RACE_FORMATION };
+}
+
+// Setup runners for lane-based start
+export function setupLaneStart(player, aiRunners, raceMode) {
+    const config = RACE_MODES[raceMode];
+    if (!config) return;
+
+    // Assign player to lane 1
+    const playerLane = 1;
+    const playerStagger = getStaggeredStartDistance(playerLane, raceMode);
+    player.distance = playerStagger;
+    player.lanePosition = LANE_FORMATION[0].lanePosition;
+    player.assignedLane = playerLane;
+
+    // Assign AI runners to lanes 2-8
+    for (let i = 0; i < aiRunners.length && i < 7; i++) {
+        const laneIndex = i + 1; // Lanes 2-8 (index 1-7)
+        const laneData = LANE_FORMATION[laneIndex];
+        const stagger = getStaggeredStartDistance(laneData.lane, raceMode);
+
+        aiRunners[i].distance = stagger;
+        aiRunners[i].lanePosition = laneData.lanePosition;
+        aiRunners[i].lane = laneData.lane;
+        aiRunners[i].assignedLane = laneData.lane;
+        aiRunners[i].stayInLane = config.stayInLane;
+
+        // Update model position
+        const pos = getPosition(aiRunners[i].distance, aiRunners[i].lanePosition);
+        const groundY = pos.y || 0;
+        aiRunners[i].model.position.set(pos.x, groundY, pos.z);
+    }
+}
 
 export function formatTime(seconds) {
     const mins = Math.floor(seconds / 60);

@@ -18,13 +18,23 @@ import {
 import { Player, formatPace } from './Player.js';
 
 import {
-    RACE_DISTANCE, ORIGINAL_WINNER_TIME, LAST_LAP_DISTANCE,
     createRaceClock, updateClockDisplay, playLastLapBell, getDistanceToLeader,
-    resolveCollisions, RACE_FORMATION, ROW_SPACING, START_OFFSET, formatTime
+    resolveCollisions, formatTime,
+    LANE_FORMATION, getFormation, setupLaneStart, getStaggeredStartDistance
 } from './Race.js';
 
 import { CelicaEasterEgg, CELICA_TRIGGER_DISTANCE } from './EasterEggs.js';
+
+// Race mode imports
+import { RACE_MODES, RACE_MODE, INPUT_TYPE, ENERGY_TYPE, getRaceDistance, getCurrentLap, isInKickPhase } from './RaceConfig.js';
+import { InputManager } from './InputManager.js';
+import { createEnergySystem } from './EnergySystem.js';
+import { RelayManager } from './RelayManager.js';
+import { getScoreboard } from './Scoreboard.js';
+import { GhostManager } from './GhostRunner.js';
+import { createExchangeZoneUI, updateExchangeZoneUI } from './ExchangeZone.js';
 import { getCityPathLength, getCityStreetPosition } from './Track.js';
+import { getNetworkManager } from './NetworkManager.js';
 
 // ============================================
 // SCENE SETUP
@@ -851,17 +861,160 @@ function setView(viewName) {
 
 document.getElementById('settingsButton').addEventListener('click', () => {
     document.getElementById('settingsModal').style.display = 'flex';
+
+    // Disable map options during a race
+    document.querySelectorAll('.view-option').forEach(opt => {
+        if (raceStarted) {
+            opt.style.opacity = '0.4';
+            opt.style.pointerEvents = 'none';
+            opt.title = 'Cannot change map during race';
+        } else {
+            opt.style.opacity = '1';
+            opt.style.pointerEvents = 'auto';
+            opt.title = '';
+        }
+    });
+
+    // Show restart race button during a race (for host in multiplayer, or always in single player)
+    const restartSection = document.getElementById('restartRaceSection');
+    const networkManager = getNetworkManager();
+    if (restartSection) {
+        const isMultiplayer = networkManager && networkManager.connections.size > 0;
+        const canRestart = raceStarted && (!isMultiplayer || networkManager.isHost);
+        restartSection.style.display = canRestart ? 'block' : 'none';
+    }
 });
 
 document.getElementById('settingsClose').addEventListener('click', () => {
     document.getElementById('settingsModal').style.display = 'none';
 });
 
+document.getElementById('quitGame').addEventListener('click', () => {
+    // Hide settings modal
+    document.getElementById('settingsModal').style.display = 'none';
+
+    // Reset game state
+    raceStarted = false;
+    player.raceActive = false;
+    raceTime = 0;
+    lastLapBellPlayed = false;
+
+    // Hide game UI
+    document.getElementById('startButton').style.display = 'none';
+    document.getElementById('paceSliderContainer').style.display = 'none';
+    document.getElementById('raceInfo').style.display = 'none';
+    document.getElementById('info').style.display = 'none';
+
+    // Show main menu
+    document.getElementById('mainMenuModal').style.display = 'flex';
+
+    // Remove player ghost if exists
+    if (playerGhost) {
+        scene.remove(playerGhost);
+        playerGhost = null;
+        playerGhostMixer = null;
+        playerGhostAction = null;
+    }
+
+    // Reset character selection
+    window.playerCharacter = null;
+    window.playerCharacterModel = null;
+
+    console.log('Quit to main menu');
+});
+
 document.querySelectorAll('.view-option').forEach(option => {
     option.addEventListener('click', () => {
+        // Don't allow map changes during a race
+        if (raceStarted) {
+            console.log('Cannot change map during a race');
+            return;
+        }
         setView(option.dataset.view);
     });
 });
+
+// Restart race button (host only)
+document.getElementById('restartRaceButton').addEventListener('click', () => {
+    const networkManager = getNetworkManager();
+    if (networkManager && networkManager.isHost) {
+        networkManager.restartRace();
+    } else {
+        // Single player restart
+        restartRace();
+    }
+    document.getElementById('settingsModal').style.display = 'none';
+});
+
+// Restart race function
+function restartRace() {
+    console.log('Restarting race...');
+
+    // Reset race time
+    raceTime = 0;
+    lastLapBellPlayed = false;
+
+    // Reset player position
+    player.distance = 0;
+    player.finished = false;
+    player.raceActive = true;
+    const startPos = getPosition(0, player.lanePosition);
+    if (playerGhost) {
+        playerGhost.position.set(startPos.x, startPos.y || 0, startPos.z);
+    }
+
+    // Reset AI runners
+    aiRunners.forEach((runner, i) => {
+        runner.distance = 0;
+        runner.finished = false;
+        const runnerStartPos = getPosition(0, runner.lane);
+        if (runner.model) {
+            runner.model.position.set(runnerStartPos.x, runnerStartPos.y || 0, runnerStartPos.z);
+        }
+    });
+
+    // Reset remote player distances (visual only, they'll sync their own positions)
+    remotePlayerMeshes.forEach((meshData, peerId) => {
+        meshData.distance = 0;
+        if (meshData.mesh) {
+            const remoteStartPos = getPosition(0, meshData.lanePosition || 1);
+            meshData.mesh.position.set(remoteStartPos.x, remoteStartPos.y || 0, remoteStartPos.z);
+        }
+    });
+
+    // Reset energy system
+    if (energySystem) {
+        energySystem.reset();
+    }
+
+    // Reset relay manager
+    if (relayManager) {
+        relayManager.reset();
+        relayManager.startRace(0);
+    }
+
+    // Reset input manager
+    if (inputManager) {
+        inputManager.resetSpeed(0);
+    }
+
+    // Stop any celebration
+    stopWinnerCelebration();
+
+    // Reset replay data
+    raceReplayData = [];
+    lastReplayRecordTime = 0;
+
+    // Reset ghosts
+    if (ghostManager) {
+        ghostManager.resetAll();
+    }
+
+    console.log('Race restarted!');
+}
+
+// Expose restart function for network callback
+window.restartRace = restartRace;
 
 // ============================================
 // GAME STATE
@@ -870,9 +1023,327 @@ document.querySelectorAll('.view-option').forEach(option => {
 const aiRunners = [];
 let raceStarted = false;
 let raceTime = 0;
-let timeScaleFactor = 1.0;
-let userGoalTime = 0;
+// Default to 15:00 pace (900 seconds goal, winner at 890 seconds)
+// timeScaleFactor = 890 / 791.3 ≈ 1.125
+let timeScaleFactor = 890 / 791.3;
+let userGoalTime = 900;
 let lastLapBellPlayed = false;
+
+// Race replay recording
+let raceReplayData = [];
+const REPLAY_RECORD_INTERVAL = 1 / 30; // 30 FPS recording
+let lastReplayRecordTime = 0;
+
+// Ghost vs AI mode (true = race against past race ghosts, false = race against AI)
+let useGhostsInsteadOfAI = false;
+
+// Race mode state
+let currentRaceMode = null; // Set from window.raceMode after selection
+let inputManager = null;
+let energySystem = null;
+let relayManager = null;
+let ghostManager = null;
+let scoreboard = null;
+let raceDistance = 1600; // Will be updated based on mode
+
+// Initialize scoreboard
+scoreboard = getScoreboard();
+
+// Multiplayer state
+let isMultiplayer = false;
+const remotePlayerMeshes = new Map(); // peerId -> { mesh, mixer, action }
+let networkUpdateInterval = null;
+
+// Get network manager (singleton)
+const networkManager = getNetworkManager();
+
+// Setup network callbacks for remote player updates
+function setupNetworkSync() {
+    networkManager.on('onPlayerUpdate', (player) => {
+        updateRemotePlayerPosition(player);
+    });
+
+    networkManager.on('onPlayerJoin', (player) => {
+        console.log('Remote player joined race:', player.name);
+        createRemotePlayerMesh(player);
+    });
+
+    networkManager.on('onPlayerLeave', (player) => {
+        console.log('Remote player left race:', player.name);
+        removeRemotePlayerMesh(player.peerId);
+    });
+
+    networkManager.on('onPlayerListUpdate', (players) => {
+        // Create or update meshes for all remote players
+        players.forEach(p => {
+            if (p.peerId === networkManager.localPlayer?.peerId) return;
+
+            const existingMesh = remotePlayerMeshes.get(p.peerId);
+
+            if (!existingMesh) {
+                // New player - create mesh
+                createRemotePlayerMesh(p);
+            } else if (p.characterModel && existingMesh.characterModel !== p.characterModel) {
+                // Character changed - recreate mesh
+                console.log('Updating remote player character:', p.name, p.characterModel);
+                removeRemotePlayerMesh(p.peerId);
+                createRemotePlayerMesh(p);
+            }
+        });
+    });
+
+    networkManager.on('onPlayerReady', (player) => {
+        // When a player selects their character and becomes ready,
+        // recreate their mesh with the correct character model
+        if (player.peerId !== networkManager.localPlayer?.peerId) {
+            console.log('Remote player ready with character:', player.name, player.characterModel);
+
+            // Remove old mesh (might be a fallback capsule)
+            removeRemotePlayerMesh(player.peerId);
+
+            // Create new mesh with correct character
+            createRemotePlayerMesh(player);
+        }
+    });
+}
+
+// Character model paths (must match index.html CHARACTER_MODELS)
+const REMOTE_CHARACTER_MODELS = {
+    trump: 'public/characters/trump/source/Running.fbx',
+    musk: 'public/characters/musk.fbx',
+    stalin: 'public/characters/stalin.fbx',
+    skeleton: 'public/characters/skeleton.fbx',
+    snowman: 'public/characters/snowman.fbx',
+    demon: 'public/characters/demon.fbx'
+};
+
+// Rotation offsets for models that don't face +Z by default (in radians)
+// Positive = rotate clockwise, Negative = rotate counter-clockwise
+const MODEL_ROTATION_OFFSETS = {
+    skeleton: -Math.PI / 2,  // Skeleton faces +X, needs -90 degree rotation
+    // Add other models here if they face the wrong direction
+};
+
+// Create mesh for remote players using their selected character model
+function createRemotePlayerMesh(remotePlayer) {
+    // Check if using default character (colored capsule)
+    if (remotePlayer.isDefaultCharacter || remotePlayer.characterModel === 'default') {
+        console.log('Creating default runner mesh for:', remotePlayer.name);
+        createFallbackMesh(remotePlayer);
+        return;
+    }
+
+    const loader = new FBXLoader();
+
+    // Get the character model path
+    const characterKey = remotePlayer.characterModel || 'trump';
+    const modelPath = REMOTE_CHARACTER_MODELS[characterKey];
+
+    if (!modelPath) {
+        console.log('No model path for character:', characterKey, '- using fallback');
+        createFallbackMesh(remotePlayer);
+        return;
+    }
+
+    console.log('Loading remote player model:', modelPath, 'for', remotePlayer.name);
+
+    // Create placeholder while loading
+    remotePlayerMeshes.set(remotePlayer.peerId, {
+        mesh: null,
+        mixer: null,
+        action: null,
+        distance: remotePlayer.distance || 0,
+        lanePosition: remotePlayer.lane || 1,
+        characterModel: remotePlayer.characterModel,
+        loading: true
+    });
+
+    loader.load(
+        modelPath,
+        (fbx) => {
+            // Scale the model
+            fbx.scale.setScalar(0.01);
+
+            // Setup animation
+            const mixer = new THREE.AnimationMixer(fbx);
+            let action = null;
+            if (fbx.animations.length > 0) {
+                action = mixer.clipAction(fbx.animations[0]);
+                action.play();
+            }
+
+            // Apply shadow settings
+            fbx.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                }
+            });
+
+            // Position on track
+            const meshData = remotePlayerMeshes.get(remotePlayer.peerId);
+            if (meshData) {
+                const pos = getPosition(meshData.distance, meshData.lanePosition);
+                fbx.position.set(pos.x, pos.y || 0, pos.z);
+
+                // Face forward
+                const aheadPos = getPosition(meshData.distance + 2, meshData.lanePosition);
+                fbx.lookAt(aheadPos.x, aheadPos.y || 0, aheadPos.z);
+
+                // Apply model-specific rotation offset
+                const rotationOffset = MODEL_ROTATION_OFFSETS[remotePlayer.characterModel] || 0;
+                if (rotationOffset !== 0) {
+                    fbx.rotation.y += rotationOffset;
+                }
+            }
+
+            scene.add(fbx);
+
+            // Update the mesh data
+            remotePlayerMeshes.set(remotePlayer.peerId, {
+                mesh: fbx,
+                mixer: mixer,
+                action: action,
+                distance: meshData?.distance || 0,
+                lanePosition: meshData?.lanePosition || 1,
+                characterModel: remotePlayer.characterModel,
+                loading: false
+            });
+
+            console.log('Remote player model loaded:', remotePlayer.name);
+        },
+        (progress) => {
+            // Loading progress
+        },
+        (error) => {
+            console.error('Error loading remote player model:', error);
+            // Fall back to simple capsule on error
+            createFallbackMesh(remotePlayer);
+        }
+    );
+}
+
+// Fallback capsule mesh if model fails to load
+function createFallbackMesh(remotePlayer) {
+    const geometry = new THREE.CapsuleGeometry(0.3, 1.0, 4, 8);
+    const material = new THREE.MeshStandardMaterial({
+        color: RUNNER_COLORS[remotePlayer.lane - 1] || 0x00ff00,
+        roughness: 0.7,
+        metalness: 0.1
+    });
+
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+
+    const meshData = remotePlayerMeshes.get(remotePlayer.peerId);
+    const pos = getPosition(meshData?.distance || 0, meshData?.lanePosition || 1);
+    mesh.position.set(pos.x, (pos.y || 0) + 0.8, pos.z);
+
+    scene.add(mesh);
+
+    remotePlayerMeshes.set(remotePlayer.peerId, {
+        mesh,
+        mixer: null,
+        action: null,
+        distance: meshData?.distance || 0,
+        lanePosition: meshData?.lanePosition || 1,
+        characterModel: remotePlayer.characterModel || 'default',
+        loading: false
+    });
+}
+
+// Update remote player position from network data
+function updateRemotePlayerPosition(remotePlayer) {
+    const meshData = remotePlayerMeshes.get(remotePlayer.peerId);
+    if (!meshData) return;
+
+    // Store the updated position data
+    meshData.distance = remotePlayer.distance;
+    meshData.lanePosition = remotePlayer.lanePosition;
+
+    // If still loading, just store the data for when model loads
+    if (meshData.loading || !meshData.mesh) return;
+
+    // Update position on track
+    const pos = getPosition(meshData.distance, meshData.lanePosition);
+    const groundY = pos.y || 0;
+    meshData.mesh.position.set(pos.x, groundY, pos.z);
+
+    // Face forward
+    const aheadPos = getPosition(meshData.distance + 2, meshData.lanePosition);
+    meshData.mesh.lookAt(aheadPos.x, aheadPos.y || 0, aheadPos.z);
+
+    // Apply model-specific rotation offset (for models that don't face +Z)
+    const rotationOffset = MODEL_ROTATION_OFFSETS[meshData.characterModel] || 0;
+    if (rotationOffset !== 0) {
+        meshData.mesh.rotation.y += rotationOffset;
+    }
+}
+
+// Update remote player animations (call from animation loop)
+function updateRemotePlayerAnimations(delta) {
+    remotePlayerMeshes.forEach((meshData) => {
+        if (meshData.mixer && !meshData.loading) {
+            meshData.mixer.update(delta);
+        }
+    });
+}
+
+// Remove remote player mesh
+function removeRemotePlayerMesh(peerId) {
+    const meshData = remotePlayerMeshes.get(peerId);
+    if (meshData && meshData.mesh) {
+        scene.remove(meshData.mesh);
+
+        // Dispose of all nested geometries and materials (for FBX models)
+        meshData.mesh.traverse((child) => {
+            if (child.isMesh) {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    if (Array.isArray(child.material)) {
+                        child.material.forEach(m => m.dispose());
+                    } else {
+                        child.material.dispose();
+                    }
+                }
+            }
+        });
+
+        // Stop animations
+        if (meshData.mixer) {
+            meshData.mixer.stopAllAction();
+        }
+
+        remotePlayerMeshes.delete(peerId);
+    }
+}
+
+// Send local player position update to network
+function sendNetworkUpdate() {
+    if (!networkManager.isConnected() || !raceStarted) return;
+
+    networkManager.sendPlayerUpdate(
+        player.distance,
+        player.lanePosition,
+        player.finished,
+        player.finishTime
+    );
+}
+
+// Get remote runners as collision objects (for lane movement collision detection)
+function getRemoteRunnersForCollision() {
+    const remoteRunners = [];
+    remotePlayerMeshes.forEach((meshData, peerId) => {
+        if (!meshData.loading && meshData.mesh) {
+            remoteRunners.push({
+                distance: meshData.distance,
+                lanePosition: meshData.lanePosition
+            });
+        }
+    });
+    return remoteRunners;
+}
 
 // Player instance
 const player = new Player(camera);
@@ -891,55 +1362,174 @@ const shuffledRaceData = shuffleArray(RACE_DATA);
 // LOAD RUNNERS
 // ============================================
 
-const loader = new FBXLoader();
-loader.load(
-    'models/Running.fbx',
-    (fbx) => {
-        for (let i = 0; i < 7; i++) {
-            const lane = i + 2;
-            const aiModel = (i === 0) ? fbx : SkeletonUtils.clone(fbx);
+// Load runners - use selected character for first runner if available
+function loadRunners() {
+    const loader = new FBXLoader();
+    const defaultModel = 'models/Running.fbx';
 
-            const aiMixer = new THREE.AnimationMixer(aiModel);
-            let aiAction = null;
-            if (fbx.animations.length > 0) {
-                aiAction = aiMixer.clipAction(fbx.animations[0]);
-                aiAction.play();
-                aiAction.paused = true;
+    // Get player's selected character model path (set by character selection screen)
+    const playerCharacterPath = window.playerCharacterModel?.path || null;
+
+    // Load default model for AI runners
+    loader.load(
+        defaultModel,
+        (fbx) => {
+            for (let i = 0; i < 7; i++) {
+                const lane = i + 2;
+                const aiModel = (i === 0) ? fbx : SkeletonUtils.clone(fbx);
+
+                const aiMixer = new THREE.AnimationMixer(aiModel);
+                let aiAction = null;
+                if (fbx.animations.length > 0) {
+                    aiAction = aiMixer.clipAction(fbx.animations[0]);
+                    aiAction.play();
+                    aiAction.paused = true;
+                }
+
+                const runner = new Runner(
+                    aiModel,
+                    aiMixer,
+                    aiAction,
+                    lane,
+                    shuffledRaceData[i],
+                    i
+                );
+
+                const startPos = getPosition(0, lane);
+                aiModel.position.set(startPos.x, 0, startPos.z);
+                aiModel.rotation.y = startPos.rotation;
+
+                scene.add(aiModel);
+                aiRunners.push(runner);
             }
 
-            const runner = new Runner(
-                aiModel,
-                aiMixer,
-                aiAction,
-                lane,
-                shuffledRaceData[i],
-                i
-            );
+            document.getElementById('loading').style.display = 'none';
+            console.log('AI Runners created:', aiRunners.length);
 
-            const startPos = getPosition(0, lane);
-            aiModel.position.set(startPos.x, 0, startPos.z);
-            aiModel.rotation.y = startPos.rotation;
+            aiRunners.forEach(r => {
+                console.log(`Lane ${r.lane}: ${r.raceData.name}`);
+            });
 
-            scene.add(aiModel);
-            aiRunners.push(runner);
+            // If player selected a custom character, load it as an additional "ghost" runner
+            if (playerCharacterPath) {
+                loadPlayerCharacterGhost(playerCharacterPath);
+            }
+        },
+        (progress) => {
+            const percent = (progress.loaded / progress.total * 100).toFixed(0);
+            document.getElementById('loading').textContent = `Loading runners... ${percent}%`;
+        },
+        (error) => {
+            console.error('Error loading character:', error);
+            document.getElementById('loading').textContent = 'Error loading. Run: python3 -m http.server 8000';
         }
+    );
+}
 
-        document.getElementById('loading').style.display = 'none';
-        console.log('AI Runners created:', aiRunners.length);
+// Load player's selected character as a "ghost" that follows the player
+let playerGhost = null;
+let playerGhostMixer = null;
+let playerGhostAction = null;
 
-        aiRunners.forEach(r => {
-            console.log(`Lane ${r.lane}: ${r.raceData.name}`);
-        });
-    },
-    (progress) => {
-        const percent = (progress.loaded / progress.total * 100).toFixed(0);
-        document.getElementById('loading').textContent = `Loading runners... ${percent}%`;
-    },
-    (error) => {
-        console.error('Error loading character:', error);
-        document.getElementById('loading').textContent = 'Error loading. Run: python3 -m http.server 8000';
+function loadPlayerCharacterGhost(modelPath) {
+    const loader = new FBXLoader();
+    console.log('Loading player character:', modelPath);
+
+    loader.load(
+        modelPath,
+        (fbx) => {
+            playerGhost = fbx;
+            // Scale to reasonable human size
+            playerGhost.scale.setScalar(0.01);
+
+            // Debug: log the model's bounding box to see actual size
+            const box = new THREE.Box3().setFromObject(playerGhost);
+            const size = box.getSize(new THREE.Vector3());
+            console.log('Player model size after scaling:', size.x.toFixed(2), size.y.toFixed(2), size.z.toFixed(2));
+
+            playerGhostMixer = new THREE.AnimationMixer(playerGhost);
+            if (fbx.animations.length > 0) {
+                playerGhostAction = playerGhostMixer.clipAction(fbx.animations[0]);
+                playerGhostAction.play();
+            }
+
+            scene.add(playerGhost);
+            console.log('Player character ghost loaded:', window.playerCharacter);
+        },
+        undefined,
+        (error) => {
+            console.error('Error loading player character:', error);
+        }
+    );
+}
+
+// Expose to window so it can be called from HTML
+window.loadPlayerCharacter = function() {
+    if (!playerGhost && window.playerCharacterModel?.path) {
+        loadPlayerCharacterGhost(window.playerCharacterModel.path);
     }
-);
+};
+
+// Start race after synchronized countdown (called from network sync)
+// This bypasses the local countdown since it was already handled via network
+window.startRaceAfterCountdown = function() {
+    startRace();
+};
+
+// Export setView so it can be called from network sync
+window.setView = function(viewName) {
+    setView(viewName);
+};
+
+// Reset game state for next race or returning to menu
+window.resetGameState = function() {
+    raceStarted = false;
+    player.raceActive = false;
+    player.finished = false;
+    raceTime = 0;
+    lastLapBellPlayed = false;
+
+    // Stop any ongoing celebration
+    stopWinnerCelebration();
+
+    // Disable focus warning
+    if (window.setRaceActiveForFocus) {
+        window.setRaceActiveForFocus(false);
+    }
+
+    // Reset ghosts
+    if (ghostManager) {
+        ghostManager.clearAll();
+    }
+
+    // Reset replay data
+    raceReplayData = [];
+    lastReplayRecordTime = 0;
+
+    // Reset energy system
+    energySystem = null;
+
+    // Reset relay manager
+    relayManager = null;
+
+    // Hide race UI elements
+    const energyContainer = document.getElementById('energyBarContainer');
+    if (energyContainer) energyContainer.style.display = 'none';
+
+    const mphDisplay = document.getElementById('mphDisplay');
+    if (mphDisplay) mphDisplay.style.display = 'none';
+
+    const legCounter = document.getElementById('legCounter');
+    if (legCounter) legCounter.style.display = 'none';
+
+    const lapCounter = document.getElementById('lapCounter');
+    if (lapCounter) lapCounter.style.display = 'none';
+
+    console.log('Game state reset');
+};
+
+// Call loadRunners (will be called after UI flow completes)
+loadRunners();
 
 // ============================================
 // UI EVENT HANDLERS
@@ -953,24 +1543,115 @@ document.getElementById('paceSlider').addEventListener('input', (e) => {
 
 // Start race function
 function startRace() {
-    if (raceStarted) return;
+    console.log('=== startRace() called ===');
+    console.log('  window.raceMode:', window.raceMode);
+    console.log('  window.isMultiplayer:', window.isMultiplayer);
+    console.log('  networkManager.isConnected():', networkManager.isConnected());
+
+    if (raceStarted) {
+        console.log('  Race already started, returning');
+        return;
+    }
+
+    // Stop any ongoing winner celebration
+    stopWinnerCelebration();
+
+    // Load player character if not loaded yet
+    if (!playerGhost && window.playerCharacterModel?.path) {
+        loadPlayerCharacterGhost(window.playerCharacterModel.path);
+    }
 
     // Reset Celica Easter egg
     celica.reset();
 
-    // Reset all runners in formation behind user
-    for (let i = 0; i < aiRunners.length; i++) {
-        const runner = aiRunners[i];
-        const form = RACE_FORMATION[i];
+    // Get race mode from selection (default to 1600m if not set)
+    currentRaceMode = window.raceMode || RACE_MODE.MILE_1600;
+    const modeConfig = RACE_MODES[currentRaceMode];
 
-        runner.reset(
-            START_OFFSET - (form.row + 1) * ROW_SPACING,
-            1.0 + form.laneOffset
-        );
+    // Calculate race distance based on mode
+    raceDistance = getRaceDistance(currentRaceMode, 1); // Player in lane 1
+
+    // Initialize input manager
+    inputManager = new InputManager(currentRaceMode);
+
+    // Initialize energy system based on mode
+    if (modeConfig && modeConfig.energyType) {
+        energySystem = createEnergySystem(modeConfig.energyType);
+    } else {
+        energySystem = null;
     }
 
-    // Reset player to start line
-    player.reset(START_OFFSET, 1.0);
+    // Initialize ghost manager
+    ghostManager = new GhostManager(scene);
+
+    // For 400m and 1600m SOLO races, use past race ghosts instead of AI runners
+    // Player always in lane 1, ghosts in lanes 2-8 (most recent race in lane 2)
+    // In multiplayer, use real players instead
+    const isSoloRace = !window.isMultiplayer;
+    useGhostsInsteadOfAI = isSoloRace && (currentRaceMode === RACE_MODE.SPRINT_400 || currentRaceMode === RACE_MODE.MILE_1600);
+
+    if (useGhostsInsteadOfAI) {
+        // Load recent races as ghosts
+        const recentRaces = scoreboard.getRecentRaces(currentRaceMode, 7);
+        if (recentRaces.length > 0) {
+            const ghostCount = ghostManager.loadRecentRacesAsGhosts(recentRaces);
+            console.log(`Loaded ${ghostCount} ghost(s) from past races`);
+        } else {
+            console.log('No past races found - racing solo');
+        }
+
+        // Hide AI runners for ghost-based races
+        for (const runner of aiRunners) {
+            if (runner.model) runner.model.visible = false;
+        }
+    } else {
+        // Load ghost from personal best for relay mode (if available)
+        const pb = scoreboard.getPersonalBest(currentRaceMode);
+        if (pb && pb.replayData && pb.replayData.length > 0) {
+            ghostManager.addGhostFromEntry(pb, { lanePosition: 1.0 });
+            console.log('Ghost loaded from personal best:', scoreboard.formatTime(pb.time));
+        }
+    }
+
+    // Initialize relay manager for relay mode
+    if (currentRaceMode === RACE_MODE.RELAY_4X100) {
+        relayManager = new RelayManager(scene, inputManager);
+    } else {
+        relayManager = null;
+    }
+
+    // Get formation type for this mode
+    const formationType = modeConfig ? getFormation(currentRaceMode) : { type: 'grouped', formation: RACE_FORMATION };
+
+    if (formationType.type === 'lanes' || formationType.type === 'waterfall') {
+        // Lane-based start (400m, relay, 1600m waterfall)
+        // Player in lane 1
+        const playerStagger = getStaggeredStartDistance(1, currentRaceMode);
+        player.reset(playerStagger, LANE_FORMATION[0].lanePosition);
+
+        // AI runners in lanes 2-8 (only if not using ghosts)
+        if (!useGhostsInsteadOfAI) {
+            for (let i = 0; i < aiRunners.length && i < 7; i++) {
+                const runner = aiRunners[i];
+                const laneData = LANE_FORMATION[i + 1]; // Lanes 2-8
+                const stagger = getStaggeredStartDistance(laneData.lane, currentRaceMode);
+
+                runner.reset(stagger, laneData.lanePosition);
+                runner.assignedLane = laneData.lane;
+                runner.assignedLanePosition = laneData.lanePosition;
+
+                // Set lane lock for 400m and relay (stay in lane entire race)
+                if (modeConfig && modeConfig.stayInLane) {
+                    runner.setLaneLock(true, laneData.lane, laneData.lanePosition);
+                }
+
+                // Set waterfall mode for 1600m (break to lane 1 after first curve)
+                if (formationType.type === 'waterfall') {
+                    runner.setWaterfallMode(120); // Break after ~120m (end of first curve)
+                }
+            }
+        }
+    }
 
     // Start the race
     raceStarted = true;
@@ -979,18 +1660,117 @@ function startRace() {
     updateClockDisplay(0);
     lastLapBellPlayed = false;
 
+    // Reset replay recording
+    raceReplayData = [];
+    lastReplayRecordTime = 0;
+
+    // Check if multiplayer mode
+    isMultiplayer = window.isMultiplayer && networkManager.isConnected();
+    if (isMultiplayer) {
+        setupNetworkSync();
+
+        // Create meshes for any remote players already in the lobby
+        const remotePlayers = networkManager.getRemotePlayers();
+        remotePlayers.forEach(p => {
+            if (!remotePlayerMeshes.has(p.peerId)) {
+                createRemotePlayerMesh(p);
+            }
+        });
+
+        console.log('Multiplayer mode active with', remotePlayers.length, 'remote players');
+    }
+
+    // Start relay timer if applicable
+    if (relayManager) {
+        relayManager.startRace(0);
+    }
+
+    // Show race mode specific UI
+    showRaceModeUI(currentRaceMode, modeConfig);
+
     // Hide HUD elements during race
     document.getElementById('startButton').style.display = 'none';
     document.getElementById('raceInfo').style.display = 'none';
     document.getElementById('info').style.display = 'none';
 
-    console.log('Race started!');
+    console.log(`Race started! Mode: ${currentRaceMode || 'default'}, Distance: ${raceDistance}m`);
+    console.log('  isMultiplayer:', isMultiplayer);
+    console.log('  inputManager created:', !!inputManager);
+    console.log('  modeConfig.inputType:', modeConfig?.inputType);
+
+    // Enable focus warning for race
+    if (window.setRaceActiveForFocus) {
+        window.setRaceActiveForFocus(true);
+    }
+}
+
+// Show race mode specific UI elements
+function showRaceModeUI(raceMode, config) {
+    // Show energy bar if applicable
+    const energyContainer = document.getElementById('energyBarContainer');
+    if (energyContainer) {
+        if (config && config.energyType) {
+            energyContainer.style.display = 'block';
+            const label = document.getElementById('energyLabel');
+            if (label) {
+                if (config.energyType === ENERGY_TYPE.LACTIC_ACID) {
+                    label.textContent = 'LACTIC ACID';
+                } else if (config.energyType === ENERGY_TYPE.STAMINA_KICK) {
+                    label.textContent = 'STAMINA';
+                }
+            }
+        } else {
+            energyContainer.style.display = 'none';
+        }
+    }
+
+    // Show MPH display for arrow key modes
+    const mphDisplay = document.getElementById('mphDisplay');
+    if (mphDisplay) {
+        if (config && config.inputType === INPUT_TYPE.ARROW_KEYS) {
+            mphDisplay.style.display = 'block';
+        } else {
+            mphDisplay.style.display = 'none';
+        }
+    }
+
+    // Show leg counter for relay
+    const legCounter = document.getElementById('legCounter');
+    if (legCounter) {
+        if (raceMode === RACE_MODE.RELAY_4X100) {
+            legCounter.style.display = 'block';
+            legCounter.textContent = 'LEG 1/4';
+        } else {
+            legCounter.style.display = 'none';
+        }
+    }
+
+    // Show lap counter for 1600m
+    const lapCounter = document.getElementById('lapCounter');
+    if (lapCounter) {
+        if (raceMode === RACE_MODE.MILE_1600) {
+            lapCounter.style.display = 'block';
+            lapCounter.textContent = 'LAP 1/4';
+        } else {
+            lapCounter.style.display = 'none';
+        }
+    }
 }
 
 document.getElementById('startButton').addEventListener('click', (e) => {
     e.stopPropagation();
-    document.getElementById('treadmillMessage').style.display = 'none';
-    startRace();
+    // Hide the start button immediately
+    document.getElementById('startButton').style.display = 'none';
+
+    // Run countdown, then start race
+    if (window.runCountdown) {
+        window.runCountdown(() => {
+            startRace();
+        });
+    } else {
+        // Fallback if countdown not available
+        startRace();
+    }
 });
 
 // ============================================
@@ -1074,7 +1854,7 @@ document.getElementById('goalTimeSubmit').addEventListener('click', () => {
 
     console.log(`Goal time: ${formatTime(goalSeconds)}, Winner target: ${formatTime(winnerTargetTime)}, Scale factor: ${timeScaleFactor.toFixed(3)}`);
 
-    // Show view selection instead of going straight to treadmill
+    // Show view selection
     document.getElementById('goalTimeModal').style.display = 'none';
     document.getElementById('viewSelectModal').style.display = 'flex';
 });
@@ -1100,96 +1880,21 @@ document.getElementById('viewSelectSubmit').addEventListener('click', () => {
     });
 
     document.getElementById('viewSelectModal').style.display = 'none';
-    document.getElementById('treadmillMessage').style.display = 'block';
+    // Treadmill message removed
     document.getElementById('startButton').style.display = 'block';
-    document.getElementById('paceSliderContainer').style.display = 'flex';
+
+    // Only show pace slider for modes that use it (not arrow keys or spacebar mash)
+    const selectedMode = window.raceMode;
+    const modeConfig = selectedMode ? RACE_MODES[selectedMode] : null;
+    const usesPaceSlider = !modeConfig || (!modeConfig.inputType);
+    document.getElementById('paceSliderContainer').style.display = usesPaceSlider ? 'flex' : 'none';
 });
 
 // ============================================
-// ANIMATION LOOP
+// ANIMATION LOOP (defined below with path editor integration)
 // ============================================
 
 let prevTime = performance.now();
-
-function animate() {
-    requestAnimationFrame(animate);
-
-    const time = performance.now();
-    const delta = (time - prevTime) / 1000;
-    prevTime = time;
-
-    // Update city water waves and traffic
-    updateCityWater(time);
-    updateCityCars(delta);
-
-    if (raceStarted) {
-        // Update player
-        player.update(delta, time, aiRunners);
-
-        // Update race time and clock
-        raceTime += delta;
-        updateClockDisplay(raceTime);
-
-        // Check for Celica trigger
-        if (aiRunners.length > 0) {
-            const leader = aiRunners.reduce((max, r) => r.distance > max.distance ? r : max, aiRunners[0]);
-            celica.checkTrigger(leader.distance);
-        }
-
-        // Update Celica
-        celica.update(delta, aiRunners, camera);
-
-        // Update AI runners
-        for (const runner of aiRunners) {
-            runner.update(delta, timeScaleFactor, aiRunners, RACE_DISTANCE);
-        }
-
-        // Resolve collisions
-        if (aiRunners.length > 0) {
-            resolveCollisions(player, aiRunners, delta);
-        }
-
-        // Check for last lap bell
-        if (!lastLapBellPlayed && aiRunners.length > 0) {
-            const leader = aiRunners.reduce((max, r) => r.distance > max.distance ? r : max, aiRunners[0]);
-
-            if (leader.distance >= LAST_LAP_DISTANCE) {
-                const leaderPos = getPosition(leader.distance, leader.lanePosition);
-                const distToLeader = getDistanceToLeader(camera.position, leaderPos);
-
-                const maxDistance = 200;
-                const minVolume = 0.2;
-                const volume = Math.max(minVolume, 1.0 - (distToLeader / maxDistance) * (1.0 - minVolume));
-
-                playLastLapBell(volume);
-                lastLapBellPlayed = true;
-                console.log(`Last lap bell! Leader at ${leader.distance.toFixed(0)}m`);
-            }
-        }
-
-        // Check if all runners finished
-        if (aiRunners.length > 0 && aiRunners.every(r => r.finished)) {
-            if (document.getElementById('startButton').textContent !== 'RESTART RACE') {
-                document.getElementById('startButton').textContent = 'RESTART RACE';
-                document.getElementById('startButton').style.display = 'block';
-                document.getElementById('startButton').disabled = false;
-                raceStarted = false;
-                player.raceActive = false;
-            }
-        }
-    } else {
-        // Keep animations paused before race
-        for (const runner of aiRunners) {
-            if (runner.mixer) {
-                runner.mixer.update(0);
-            }
-        }
-    }
-
-    renderer.render(scene, camera);
-}
-
-// animate() is called by animateWithPathEditor() at the end of the file
 
 // ============================================
 // WINDOW RESIZE
@@ -1422,8 +2127,7 @@ setTimeout(() => {
     });
 }, 100);
 
-// Integrate path editor into animation loop
-const originalAnimate = animate;
+// Main animation loop with path editor integration
 function animateWithPathEditor() {
     requestAnimationFrame(animateWithPathEditor);
 
@@ -1441,16 +2145,170 @@ function animateWithPathEditor() {
     updateCityWater(time);
     updateCityCars(delta);
 
+    // Update confetti animation
+    updateConfetti(delta);
+
+    // Victory lap - player jogs slowly after winning
+    if (victoryLapActive && playerGhost) {
+        player.distance += victoryLapSpeed * delta;
+
+        const ghostPos = getPosition(player.distance, player.lanePosition);
+        const groundY = ghostPos.y || 0;
+        playerGhost.position.set(ghostPos.x, groundY, ghostPos.z);
+        // Apply base rotation plus model-specific offset
+        const playerGhostOffset = MODEL_ROTATION_OFFSETS[window.playerCharacter] || 0;
+        playerGhost.rotation.y = ghostPos.rotation + playerGhostOffset;
+
+        // Update player camera to follow
+        player.update(delta, time, []);
+
+        // Slow jog animation
+        if (playerGhostMixer) {
+            playerGhostMixer.update(delta * 0.5);
+        }
+    }
+
     if (raceStarted) {
-        // Update player
-        player.update(delta, time, aiRunners);
+        // Update input manager
+        if (inputManager) {
+            inputManager.update(delta);
+        }
+
+        // Get player speed based on input mode
+        let playerSpeed = player.paceToSpeed(); // Default pace-based
+        const modeConfig = currentRaceMode ? RACE_MODES[currentRaceMode] : null;
+
+        if (inputManager && modeConfig) {
+            if (modeConfig.inputType === INPUT_TYPE.SPACEBAR_MASH) {
+                // Relay: speed from spacebar mashing
+                playerSpeed = inputManager.currentSpeed;
+            } else if (modeConfig.inputType === INPUT_TYPE.ARROW_KEYS) {
+                // 400m/1600m: speed from arrow keys
+                playerSpeed = inputManager.currentSpeed;
+            }
+        }
+
+        // Apply energy system effects
+        let energySpeedMultiplier = 1.0;
+        if (energySystem && modeConfig) {
+            // Check if drafting (for 1600m stamina mode)
+            const isDrafting = aiRunners.some(runner => {
+                const distDiff = runner.distance - player.distance;
+                const laneDiff = Math.abs(runner.lanePosition - player.lanePosition);
+                return distDiff > 0.5 && distDiff < 2.0 && laneDiff < 0.3;
+            });
+
+            energySpeedMultiplier = energySystem.update(playerSpeed, delta, isDrafting, player.distance);
+
+            // Update energy bar UI
+            updateEnergyUI(energySystem, modeConfig);
+
+            // Check for DNF (lactic acid full)
+            if (energySystem.isDNF && energySystem.isDNF()) {
+                handleDNF();
+            }
+        }
+
+        // Apply speed multiplier from energy
+        playerSpeed *= energySpeedMultiplier;
+
+        // Get remote runners for collision detection
+        const remoteRunners = isMultiplayer ? getRemoteRunnersForCollision() : [];
+
+        // Update player distance (custom speed for new modes)
+        if (modeConfig && (modeConfig.inputType === INPUT_TYPE.SPACEBAR_MASH || modeConfig.inputType === INPUT_TYPE.ARROW_KEYS)) {
+            player.distance += playerSpeed * delta;
+            // Still update camera position and lane movement, but skip distance update (we handle it above)
+            player.update(delta, time, aiRunners, inputManager, remoteRunners, true);
+        } else {
+            // Default pace-based update
+            player.update(delta, time, aiRunners, inputManager, remoteRunners);
+        }
+
+        // Send network update in multiplayer mode
+        if (isMultiplayer) {
+            sendNetworkUpdate();
+            updateRemotePlayerAnimations(delta);
+        }
+
+        // Update relay manager (exchange zones, handoffs)
+        if (relayManager) {
+            relayManager.update(delta, raceTime, player.distance, player, playerSpeed);
+
+            // Update leg counter UI
+            const legCounter = document.getElementById('legCounter');
+            if (legCounter) {
+                legCounter.textContent = `LEG ${relayManager.getCurrentLegDisplay()}/4`;
+            }
+
+            // Update exchange zone indicator
+            const exchangeIndicator = document.getElementById('exchangeZoneIndicator');
+            if (exchangeIndicator) {
+                if (relayManager.isInExchangeZone()) {
+                    exchangeIndicator.style.display = 'block';
+                } else {
+                    exchangeIndicator.style.display = 'none';
+                }
+            }
+
+            // Check for relay end (success or failure)
+            if (relayManager.isRaceOver()) {
+                const result = relayManager.getRaceResult();
+                // Relay solo time trial - always a "winner" if completed successfully
+                if (result.success) {
+                    result.isWinner = true;
+                }
+                handleRaceEnd(result);
+            }
+        }
+
+        // Update ghost runners
+        if (ghostManager) {
+            ghostManager.update(raceTime);
+        }
+
+        // Update MPH display
+        if (inputManager) {
+            const mphDisplay = document.getElementById('mphDisplay');
+            if (mphDisplay && mphDisplay.style.display !== 'none') {
+                mphDisplay.textContent = `${inputManager.getSpeedMPH().toFixed(1)} MPH`;
+            }
+        }
+
+        // Update lap counter for 1600m
+        if (currentRaceMode === RACE_MODE.MILE_1600) {
+            const currentLap = getCurrentLap(player.distance, currentRaceMode);
+            const lapCounter = document.getElementById('lapCounter');
+            if (lapCounter) {
+                lapCounter.textContent = `LAP ${Math.min(currentLap, 4)}/4`;
+            }
+
+            // Check for kick phase transition
+            if (energySystem && isInKickPhase(player.distance, currentRaceMode) && !energySystem.inKickPhase) {
+                energySystem.enterKickPhase();
+                const energyLabel = document.getElementById('energyLabel');
+                if (energyLabel) {
+                    energyLabel.textContent = 'KICK';
+                }
+            }
+        }
 
         // Update race time and clock
         raceTime += delta;
         updateClockDisplay(raceTime);
 
-        // Check for Celica trigger
-        if (aiRunners.length > 0) {
+        // Record replay data (for ghost playback of past races)
+        if (!relayManager && raceTime - lastReplayRecordTime >= REPLAY_RECORD_INTERVAL) {
+            raceReplayData.push({
+                time: raceTime,
+                distance: player.distance,
+                lanePosition: player.lanePosition
+            });
+            lastReplayRecordTime = raceTime;
+        }
+
+        // Check for Celica trigger (only in non-relay modes)
+        if (!relayManager && aiRunners.length > 0) {
             const leader = aiRunners.reduce((max, r) => r.distance > max.distance ? r : max, aiRunners[0]);
             celica.checkTrigger(leader.distance);
         }
@@ -1458,44 +2316,54 @@ function animateWithPathEditor() {
         // Update Celica
         celica.update(delta, aiRunners, camera);
 
-        // Update AI runners
-        for (const runner of aiRunners) {
-            runner.update(delta, timeScaleFactor, aiRunners, RACE_DISTANCE);
+        // Update AI runners (skip if using ghosts from past races)
+        if (!useGhostsInsteadOfAI) {
+            for (const runner of aiRunners) {
+                runner.update(delta, timeScaleFactor, aiRunners, raceDistance);
+            }
         }
 
-        // Resolve collisions
-        if (aiRunners.length > 0) {
+        // Update player ghost (selected character following player position)
+        if (playerGhost) {
+            // Show ghost only in third-person mode
+            playerGhost.visible = (player.cameraMode === 'third-person');
+
+            const ghostPos = getPosition(player.distance, player.lanePosition);
+            const groundY = ghostPos.y || 0;
+            playerGhost.position.set(ghostPos.x, groundY, ghostPos.z);
+            // Apply base rotation plus model-specific offset
+            const playerGhostOffset = MODEL_ROTATION_OFFSETS[window.playerCharacter] || 0;
+            playerGhost.rotation.y = ghostPos.rotation + playerGhostOffset;
+
+            if (playerGhostMixer) {
+                // Speed up animation based on player speed
+                const speedMultiplier = playerSpeed / 3; // Base animation speed ratio
+                playerGhostMixer.update(delta * Math.max(0.3, speedMultiplier));
+            }
+        }
+
+        // Resolve collisions (skip for relay solo mode and ghost mode)
+        if (!relayManager && !useGhostsInsteadOfAI && aiRunners.length > 0) {
             resolveCollisions(player, aiRunners, delta);
         }
 
-        // Check for last lap bell
-        if (!lastLapBellPlayed && aiRunners.length > 0) {
-            const leader = aiRunners.reduce((max, r) => r.distance > max.distance ? r : max, aiRunners[0]);
+        // Check for last lap bell (1600m - final 400m)
+        if (!lastLapBellPlayed && currentRaceMode === RACE_MODE.MILE_1600) {
+            const bellDistance = raceDistance - 400; // Last 400m
 
-            if (leader.distance >= LAST_LAP_DISTANCE) {
-                const leaderPos = getPosition(leader.distance, leader.lanePosition);
-                const distToLeader = getDistanceToLeader(camera.position, leaderPos);
+            const checkDistance = aiRunners.length > 0
+                ? Math.max(player.distance, ...aiRunners.map(r => r.distance))
+                : player.distance;
 
-                const maxDistance = 200;
-                const minVolume = 0.2;
-                const volume = Math.max(minVolume, 1.0 - (distToLeader / maxDistance) * (1.0 - minVolume));
-
-                playLastLapBell(volume);
+            if (checkDistance >= bellDistance) {
+                playLastLapBell(1.0);
                 lastLapBellPlayed = true;
-                console.log(`Last lap bell! Leader at ${leader.distance.toFixed(0)}m`);
+                console.log('Last lap bell!');
             }
         }
 
-        // Check if all runners finished
-        if (aiRunners.length > 0 && aiRunners.every(r => r.finished)) {
-            if (document.getElementById('startButton').textContent !== 'RESTART RACE') {
-                document.getElementById('startButton').textContent = 'RESTART RACE';
-                document.getElementById('startButton').style.display = 'block';
-                document.getElementById('startButton').disabled = false;
-                raceStarted = false;
-                player.raceActive = false;
-            }
-        }
+        // Check for race finish
+        checkRaceFinish();
     } else {
         // Keep animations paused before race
         for (const runner of aiRunners) {
@@ -1506,6 +2374,288 @@ function animateWithPathEditor() {
     }
 
     renderer.render(scene, camera);
+}
+
+// ============================================
+// WINNER CELEBRATION SYSTEM
+// ============================================
+
+let confettiParticles = [];
+let confettiCanvas = null;
+let confettiCtx = null;
+let confettiActive = false;
+let victoryLapActive = false;
+let victoryLapSpeed = 2.0; // Slow jog speed (m/s)
+
+function initConfetti() {
+    confettiCanvas = document.getElementById('confettiCanvas');
+    if (confettiCanvas) {
+        confettiCanvas.width = window.innerWidth;
+        confettiCanvas.height = window.innerHeight;
+        confettiCtx = confettiCanvas.getContext('2d');
+    }
+}
+
+function createConfettiParticle() {
+    // Shades of green for the confetti
+    const greens = [
+        '#00ff00', '#00cc00', '#00ee00', '#33ff33',
+        '#66ff66', '#00aa00', '#22dd22', '#44ff44',
+        '#00ff44', '#44ff00', '#88ff88', '#00dd44'
+    ];
+
+    return {
+        x: Math.random() * window.innerWidth,
+        y: -20,
+        width: Math.random() * 10 + 5,
+        height: Math.random() * 6 + 3,
+        color: greens[Math.floor(Math.random() * greens.length)],
+        velocityX: (Math.random() - 0.5) * 8,
+        velocityY: Math.random() * 3 + 2,
+        rotation: Math.random() * 360,
+        rotationSpeed: (Math.random() - 0.5) * 15,
+        wobble: Math.random() * Math.PI * 2,
+        wobbleSpeed: Math.random() * 0.1 + 0.05
+    };
+}
+
+function spawnConfettiBurst(count = 100) {
+    for (let i = 0; i < count; i++) {
+        const particle = createConfettiParticle();
+        // Spawn from different positions for burst effect
+        particle.x = window.innerWidth / 2 + (Math.random() - 0.5) * 400;
+        particle.y = window.innerHeight / 3;
+        particle.velocityX = (Math.random() - 0.5) * 20;
+        particle.velocityY = -Math.random() * 15 - 5;
+        confettiParticles.push(particle);
+    }
+}
+
+function updateConfetti(delta) {
+    if (!confettiCtx || !confettiActive) return;
+
+    // Clear canvas
+    confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+
+    // Spawn new particles occasionally
+    if (confettiParticles.length < 200 && Math.random() < 0.3) {
+        confettiParticles.push(createConfettiParticle());
+    }
+
+    // Update and draw particles
+    for (let i = confettiParticles.length - 1; i >= 0; i--) {
+        const p = confettiParticles[i];
+
+        // Physics
+        p.velocityY += 0.2; // Gravity
+        p.x += p.velocityX;
+        p.y += p.velocityY;
+        p.rotation += p.rotationSpeed;
+        p.wobble += p.wobbleSpeed;
+        p.x += Math.sin(p.wobble) * 2; // Side-to-side wobble
+
+        // Draw
+        confettiCtx.save();
+        confettiCtx.translate(p.x, p.y);
+        confettiCtx.rotate(p.rotation * Math.PI / 180);
+        confettiCtx.fillStyle = p.color;
+        confettiCtx.fillRect(-p.width / 2, -p.height / 2, p.width, p.height);
+        confettiCtx.restore();
+
+        // Remove if off screen
+        if (p.y > window.innerHeight + 50) {
+            confettiParticles.splice(i, 1);
+        }
+    }
+}
+
+function startWinnerCelebration() {
+    console.log('WINNER! Starting celebration...');
+
+    // Show winner overlay
+    const winnerOverlay = document.getElementById('winnerOverlay');
+    if (winnerOverlay) {
+        winnerOverlay.style.display = 'flex';
+    }
+
+    // Initialize and start confetti
+    initConfetti();
+    confettiActive = true;
+
+    // Multiple confetti bursts
+    spawnConfettiBurst(150);
+    setTimeout(() => spawnConfettiBurst(100), 300);
+    setTimeout(() => spawnConfettiBurst(100), 600);
+    setTimeout(() => spawnConfettiBurst(80), 1000);
+
+    // Start victory lap
+    victoryLapActive = true;
+
+    // Hide winner text after 3 seconds but keep confetti and victory lap
+    setTimeout(() => {
+        const winnerOverlay = document.getElementById('winnerOverlay');
+        if (winnerOverlay) {
+            winnerOverlay.style.display = 'none';
+        }
+    }, 3000);
+
+    // Stop confetti after 5 seconds
+    setTimeout(() => {
+        confettiActive = false;
+        if (confettiCtx) {
+            confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+        }
+        confettiParticles = [];
+    }, 5000);
+
+    // Show post-race modal after celebration (for multiplayer) or restart button (for solo)
+    setTimeout(() => {
+        if (window.showPostRaceModal) {
+            window.showPostRaceModal(raceTime);
+        } else {
+            // Fallback to restart button
+            document.getElementById('startButton').textContent = 'RACE AGAIN';
+            document.getElementById('startButton').style.display = 'block';
+        }
+    }, 3500);
+}
+
+function stopWinnerCelebration() {
+    confettiActive = false;
+    victoryLapActive = false;
+    confettiParticles = [];
+
+    const winnerOverlay = document.getElementById('winnerOverlay');
+    if (winnerOverlay) {
+        winnerOverlay.style.display = 'none';
+    }
+
+    if (confettiCtx) {
+        confettiCtx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    }
+}
+
+// Helper functions for race mode handling
+function updateEnergyUI(system, config) {
+    const energyBar = document.getElementById('energyBar');
+    const energyFill = document.getElementById('energyFill');
+    if (!energyBar || !energyFill) return;
+
+    let level = 0;
+    let color = '#00ff00';
+
+    if (config.energyType === ENERGY_TYPE.LACTIC_ACID) {
+        level = system.level;
+        // Color goes from green to yellow to red as lactic acid builds
+        if (level < 50) {
+            color = `rgb(${Math.floor(level * 5.1)}, 255, 0)`;
+        } else {
+            color = `rgb(255, ${Math.floor((100 - level) * 5.1)}, 0)`;
+        }
+    } else if (config.energyType === ENERGY_TYPE.STAMINA_KICK) {
+        if (system.inKickPhase) {
+            level = system.kickBar;
+        } else {
+            level = system.stamina;
+        }
+        // Green when full, yellow when medium, red when low
+        if (level > 60) {
+            color = '#00ff00';
+        } else if (level > 30) {
+            color = '#ffff00';
+        } else {
+            color = '#ff0000';
+        }
+    }
+
+    energyFill.style.width = `${level}%`;
+    energyFill.style.backgroundColor = color;
+}
+
+function handleDNF() {
+    console.log('DNF - Lactic acid overload!');
+    raceStarted = false;
+    player.raceActive = false;
+
+    // Show DNF screen
+    const dnfOverlay = document.getElementById('dnfOverlay');
+    if (dnfOverlay) {
+        dnfOverlay.style.display = 'flex';
+    }
+
+    // Show restart button
+    document.getElementById('startButton').textContent = 'RESTART RACE';
+    document.getElementById('startButton').style.display = 'block';
+}
+
+function handleRaceEnd(result) {
+    raceStarted = false;
+    player.raceActive = false;
+
+    // Disable focus warning
+    if (window.setRaceActiveForFocus) {
+        window.setRaceActiveForFocus(false);
+    }
+
+    // Clean up multiplayer state
+    if (isMultiplayer) {
+        // Send finish notification to other players
+        networkManager.sendFinish(result.totalTime || raceTime);
+
+        // Clean up remote player meshes using proper disposal
+        const peerIds = Array.from(remotePlayerMeshes.keys());
+        peerIds.forEach(peerId => removeRemotePlayerMesh(peerId));
+
+        isMultiplayer = false;
+    }
+
+    if (result.success) {
+        console.log(`Race complete! Time: ${formatTime(result.totalTime)}`);
+
+        // Save to scoreboard
+        scoreboard.saveResult(currentRaceMode, result);
+
+        // Check for personal best
+        if (scoreboard.isNewPersonalBest(currentRaceMode, result.totalTime)) {
+            console.log('NEW PERSONAL BEST!');
+        }
+
+        // Check if player won and trigger celebration
+        if (result.isWinner) {
+            startWinnerCelebration();
+            return; // Winner celebration handles the restart button
+        }
+    } else {
+        console.log(`Race failed: ${result.message}`);
+    }
+
+    // Show restart button
+    document.getElementById('startButton').textContent = 'RACE AGAIN';
+    document.getElementById('startButton').style.display = 'block';
+}
+
+function checkRaceFinish() {
+    // Check if player finished first (WINNER!)
+    if (player.distance >= raceDistance) {
+        // Relay is handled separately by RelayManager
+        if (currentRaceMode === RACE_MODE.RELAY_4X100) return;
+
+        // Check if player finished before all AI runners
+        const playerWon = aiRunners.every(r => !r.finished || r.distance < raceDistance);
+
+        // 400m or 1600m finish
+        if (currentRaceMode === RACE_MODE.SPRINT_400 || currentRaceMode === RACE_MODE.MILE_1600) {
+            const result = {
+                success: true,
+                totalTime: raceTime,
+                replayData: raceReplayData,
+                isWinner: playerWon
+            };
+            handleRaceEnd(result);
+            return;
+        }
+
+    }
 }
 
 // Replace the original animate loop

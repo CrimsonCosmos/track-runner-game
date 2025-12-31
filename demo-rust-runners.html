@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Track Runner - Rust Server Demo</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #1a1a1a;
+      color: #fff;
+      overflow: hidden;
+    }
+    #container { width: 100vw; height: 100vh; }
+    #stats {
+      position: fixed;
+      top: 10px;
+      left: 10px;
+      background: rgba(0,0,0,0.8);
+      padding: 15px;
+      border-radius: 8px;
+      font-size: 14px;
+      min-width: 200px;
+      z-index: 100;
+    }
+    #stats h3 { margin-bottom: 10px; color: #4CAF50; }
+    #stats p { margin: 5px 0; }
+    #stats .value { color: #4CAF50; font-weight: bold; }
+    #controls {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      gap: 10px;
+      z-index: 100;
+    }
+    button {
+      padding: 12px 24px;
+      font-size: 16px;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    button:hover { transform: scale(1.05); }
+    #startBtn { background: #4CAF50; color: white; }
+    #pauseBtn { background: #FF9800; color: white; }
+    #resetBtn { background: #f44336; color: white; }
+    #modeIndicator {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      padding: 10px 20px;
+      border-radius: 20px;
+      font-weight: bold;
+    }
+    #modeIndicator.rust { background: #4CAF50; }
+    #modeIndicator.js { background: #2196F3; }
+    #countdown {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 120px;
+      font-weight: bold;
+      color: #4CAF50;
+      text-shadow: 0 0 20px rgba(76, 175, 80, 0.5);
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div id="container"></div>
+
+  <div id="stats">
+    <h3>Rust Game Server</h3>
+    <p>Mode: <span id="mode" class="value">--</span></p>
+    <p>Runners: <span id="runnerCount" class="value">0</span></p>
+    <p>Race Time: <span id="raceTime" class="value">00:00</span></p>
+    <p>Status: <span id="status" class="value">--</span></p>
+    <p>Finished: <span id="finished" class="value">0</span></p>
+    <p>Tick Time: <span id="tickTime" class="value">0.00ms</span></p>
+    <p>FPS: <span id="fps" class="value">0</span></p>
+  </div>
+
+  <div id="modeIndicator" class="js">JS Mode</div>
+
+  <div id="countdown">3</div>
+
+  <div id="controls">
+    <button id="initBtn">Initialize Race</button>
+    <button id="startBtn" disabled>Start Race</button>
+    <button id="pauseBtn" disabled>Pause</button>
+    <button id="resetBtn" disabled>Reset</button>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
+
+    // Try to import Tauri bridge
+    let rustAdapter = null;
+    let useRustServer = false;
+
+    try {
+      // Dynamic import for Tauri environment
+      const { getRustWorldAdapter, isTauri } = await import('./src/tauri/index.ts');
+
+      if (isTauri()) {
+        rustAdapter = getRustWorldAdapter();
+        const initialized = await rustAdapter.init();
+        if (initialized) {
+          useRustServer = true;
+          console.log('Rust game server connected');
+        }
+      }
+    } catch (e) {
+      console.log('Tauri not available, using JS fallback:', e.message);
+    }
+
+    // Update mode indicator
+    const modeIndicator = document.getElementById('modeIndicator');
+    const modeSpan = document.getElementById('mode');
+    if (useRustServer) {
+      modeIndicator.textContent = 'Rust Mode';
+      modeIndicator.className = 'rust';
+      modeSpan.textContent = 'Rust Server';
+    } else {
+      modeIndicator.textContent = 'JS Mode';
+      modeIndicator.className = 'js';
+      modeSpan.textContent = 'JavaScript Fallback';
+    }
+
+    // ============= Three.js Setup =============
+    const container = document.getElementById('container');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x1a1a2e);
+
+    const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 2000);
+    camera.position.set(0, 80, 120);
+
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.target.set(0, 0, 0);
+    controls.enableDamping = true;
+
+    // Lighting
+    scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+    const sun = new THREE.DirectionalLight(0xffffff, 1);
+    sun.position.set(50, 100, 50);
+    sun.castShadow = true;
+    scene.add(sun);
+
+    // ============= Track (Simple Oval) =============
+    const trackRadius = 100;
+    const straightLength = 50;
+
+    // Track surface
+    const trackShape = new THREE.Shape();
+    trackShape.absarc(0, straightLength/2, trackRadius + 10, 0, Math.PI, false);
+    trackShape.lineTo(-trackRadius - 10, -straightLength/2);
+    trackShape.absarc(0, -straightLength/2, trackRadius + 10, Math.PI, 0, false);
+    trackShape.lineTo(trackRadius + 10, straightLength/2);
+
+    const trackGeo = new THREE.ShapeGeometry(trackShape);
+    trackGeo.rotateX(-Math.PI / 2);
+    const trackMat = new THREE.MeshStandardMaterial({ color: 0x994422 });
+    const track = new THREE.Mesh(trackGeo, trackMat);
+    track.receiveShadow = true;
+    scene.add(track);
+
+    // ============= Track Path Function =============
+    function getTrackPosition(distance, lane) {
+      const laneOffset = lane * 1.2;
+      const radius = trackRadius + laneOffset;
+      const totalLength = 2 * Math.PI * radius + 2 * straightLength;
+      const pos = ((distance % totalLength) + totalLength) % totalLength;
+
+      let x, z, rotation;
+
+      // Top straight
+      if (pos < straightLength) {
+        x = radius;
+        z = -straightLength/2 + pos;
+        rotation = 0;
+      }
+      // Top curve
+      else if (pos < straightLength + Math.PI * radius) {
+        const angle = (pos - straightLength) / radius;
+        x = Math.cos(angle) * radius;
+        z = straightLength/2 + Math.sin(angle) * radius;
+        rotation = angle;
+      }
+      // Bottom straight
+      else if (pos < 2 * straightLength + Math.PI * radius) {
+        const straightPos = pos - straightLength - Math.PI * radius;
+        x = -radius;
+        z = straightLength/2 - straightPos;
+        rotation = Math.PI;
+      }
+      // Bottom curve
+      else {
+        const curveStart = 2 * straightLength + Math.PI * radius;
+        const angle = Math.PI + (pos - curveStart) / radius;
+        x = Math.cos(angle) * radius;
+        z = -straightLength/2 + Math.sin(angle) * radius;
+        rotation = angle;
+      }
+
+      return { x, y: 0.5, z, rotation };
+    }
+
+    // ============= Instanced Runners =============
+    const MAX_RUNNERS = 128;
+    const runnerGeo = new THREE.CapsuleGeometry(0.4, 1.2, 4, 8);
+    runnerGeo.translate(0, 1, 0);
+    const runnerMat = new THREE.MeshStandardMaterial({
+      roughness: 0.6,
+      metalness: 0.1
+    });
+
+    const runnerMesh = new THREE.InstancedMesh(runnerGeo, runnerMat, MAX_RUNNERS);
+    runnerMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    runnerMesh.castShadow = true;
+
+    // Colors
+    const colors = new Float32Array(MAX_RUNNERS * 3);
+    const palette = [0xcc2222, 0x22cc22, 0xcccc22, 0xcc22cc, 0x22cccc, 0xff8800, 0x8822cc, 0x2288cc];
+    const color = new THREE.Color();
+    for (let i = 0; i < MAX_RUNNERS; i++) {
+      color.setHex(palette[i % palette.length]);
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
+    runnerMesh.instanceColor = new THREE.InstancedBufferAttribute(colors, 3);
+
+    // Hide all initially
+    const zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+    for (let i = 0; i < MAX_RUNNERS; i++) {
+      runnerMesh.setMatrixAt(i, zeroMatrix);
+    }
+    runnerMesh.instanceMatrix.needsUpdate = true;
+    scene.add(runnerMesh);
+
+    // ============= JS Fallback State =============
+    let jsRunners = [];
+    let jsRaceStatus = 'NotStarted';
+    let jsElapsedTime = 0;
+    let jsCountdown = 3;
+
+    function initJSRace(count = 100) {
+      jsRunners = [];
+      for (let i = 0; i < count; i++) {
+        const row = Math.floor(i / 10);
+        const col = i % 10;
+        jsRunners.push({
+          id: i,
+          distance: -row * 3,
+          lane_position: 0.8 + col * 0.15,
+          speed: 0,
+          animation_phase: Math.random(),
+          finished: false,
+          target_speed: 7 + Math.random() * 3,
+        });
+      }
+      jsRaceStatus = 'NotStarted';
+      jsElapsedTime = 0;
+      jsCountdown = 3;
+    }
+
+    function updateJSRace(delta) {
+      if (jsRaceStatus === 'Countdown') {
+        jsCountdown -= delta;
+        if (jsCountdown <= 0) {
+          jsRaceStatus = 'Racing';
+        }
+      } else if (jsRaceStatus === 'Racing') {
+        jsElapsedTime += delta * 10; // Time scale
+        for (const runner of jsRunners) {
+          if (!runner.finished) {
+            // Accelerate
+            if (runner.speed < runner.target_speed) {
+              runner.speed = Math.min(runner.speed + 2 * delta, runner.target_speed);
+            }
+            runner.distance += runner.speed * delta;
+            runner.animation_phase = (runner.animation_phase + delta * runner.speed / 2) % 1;
+
+            if (runner.distance >= 5000) {
+              runner.finished = true;
+              runner.speed *= 0.5;
+            }
+          }
+        }
+      }
+
+      return {
+        status: jsRaceStatus,
+        elapsed_time: jsElapsedTime,
+        countdown: jsCountdown,
+        runners: jsRunners,
+        finisher_count: jsRunners.filter(r => r.finished).length,
+      };
+    }
+
+    // ============= Update Instanced Mesh =============
+    const tempMatrix = new THREE.Matrix4();
+    const tempPos = new THREE.Vector3();
+    const tempQuat = new THREE.Quaternion();
+    const tempScale = new THREE.Vector3();
+    const tempEuler = new THREE.Euler();
+
+    function updateRunnerMesh(snapshot) {
+      if (!snapshot) return;
+
+      const runners = snapshot.runners;
+
+      for (let i = 0; i < runners.length; i++) {
+        const runner = runners[i];
+        const pos = getTrackPosition(runner.distance, runner.lane_position);
+
+        // Animation
+        const phase = runner.animation_phase % 1;
+        const phaseRad = phase * Math.PI * 2;
+        const intensity = Math.min(runner.speed / 8, 1);
+        const bob = Math.abs(Math.sin(phaseRad * 2)) * 0.08 * intensity;
+        const lean = Math.sin(phaseRad) * 0.05 * intensity;
+
+        tempPos.set(pos.x, pos.y + bob, pos.z);
+        tempEuler.set(lean, pos.rotation, 0);
+        tempQuat.setFromEuler(tempEuler);
+        tempScale.setScalar(1);
+
+        tempMatrix.compose(tempPos, tempQuat, tempScale);
+        runnerMesh.setMatrixAt(i, tempMatrix);
+      }
+
+      // Hide unused
+      tempMatrix.makeScale(0, 0, 0);
+      for (let i = runners.length; i < MAX_RUNNERS; i++) {
+        runnerMesh.setMatrixAt(i, tempMatrix);
+      }
+
+      runnerMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    // ============= UI Updates =============
+    const statsUI = {
+      runnerCount: document.getElementById('runnerCount'),
+      raceTime: document.getElementById('raceTime'),
+      status: document.getElementById('status'),
+      finished: document.getElementById('finished'),
+      tickTime: document.getElementById('tickTime'),
+      fps: document.getElementById('fps'),
+    };
+    const countdownEl = document.getElementById('countdown');
+
+    function formatTime(seconds) {
+      const mins = Math.floor(seconds / 60);
+      const secs = Math.floor(seconds % 60);
+      return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+    }
+
+    function updateUI(snapshot) {
+      if (!snapshot) return;
+
+      statsUI.runnerCount.textContent = snapshot.runners.length;
+      statsUI.raceTime.textContent = formatTime(snapshot.elapsed_time);
+      statsUI.status.textContent = snapshot.status;
+      statsUI.finished.textContent = snapshot.finisher_count;
+
+      // Countdown display
+      if (snapshot.status === 'Countdown') {
+        countdownEl.style.display = 'block';
+        countdownEl.textContent = Math.ceil(snapshot.countdown);
+      } else if (snapshot.status === 'Racing' && countdownEl.style.display !== 'none') {
+        countdownEl.textContent = 'GO!';
+        setTimeout(() => countdownEl.style.display = 'none', 500);
+      } else {
+        countdownEl.style.display = 'none';
+      }
+    }
+
+    // ============= Controls =============
+    const initBtn = document.getElementById('initBtn');
+    const startBtn = document.getElementById('startBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const resetBtn = document.getElementById('resetBtn');
+    let isPaused = false;
+    let lastSnapshot = null;
+
+    initBtn.addEventListener('click', async () => {
+      if (useRustServer) {
+        await rustAdapter.initRace(100, 10);
+        lastSnapshot = await rustAdapter.bridge.getSnapshot();
+      } else {
+        initJSRace(100);
+        lastSnapshot = updateJSRace(0);
+      }
+      updateRunnerMesh(lastSnapshot);
+      updateUI(lastSnapshot);
+      startBtn.disabled = false;
+      resetBtn.disabled = false;
+    });
+
+    startBtn.addEventListener('click', async () => {
+      if (useRustServer) {
+        await rustAdapter.startRace();
+        rustAdapter.startTickLoop((snapshot) => {
+          lastSnapshot = snapshot;
+        });
+      } else {
+        jsRaceStatus = 'Countdown';
+      }
+      startBtn.disabled = true;
+      pauseBtn.disabled = false;
+    });
+
+    pauseBtn.addEventListener('click', async () => {
+      isPaused = !isPaused;
+      if (useRustServer) {
+        if (isPaused) {
+          await rustAdapter.pause();
+        } else {
+          await rustAdapter.resume();
+        }
+      }
+      pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+    });
+
+    resetBtn.addEventListener('click', async () => {
+      if (useRustServer) {
+        await rustAdapter.reset();
+      }
+      lastSnapshot = null;
+      startBtn.disabled = true;
+      pauseBtn.disabled = true;
+      resetBtn.disabled = true;
+      initBtn.disabled = false;
+      isPaused = false;
+      pauseBtn.textContent = 'Pause';
+
+      // Clear mesh
+      const zeroMatrix = new THREE.Matrix4().makeScale(0, 0, 0);
+      for (let i = 0; i < MAX_RUNNERS; i++) {
+        runnerMesh.setMatrixAt(i, zeroMatrix);
+      }
+      runnerMesh.instanceMatrix.needsUpdate = true;
+    });
+
+    // ============= Animation Loop =============
+    let lastTime = performance.now();
+    let frameCount = 0;
+    let lastFpsUpdate = 0;
+
+    function animate() {
+      requestAnimationFrame(animate);
+
+      const now = performance.now();
+      const delta = (now - lastTime) / 1000;
+      lastTime = now;
+
+      // FPS counter
+      frameCount++;
+      if (now - lastFpsUpdate > 1000) {
+        statsUI.fps.textContent = frameCount;
+        frameCount = 0;
+        lastFpsUpdate = now;
+      }
+
+      // Update from Rust or JS
+      if (useRustServer) {
+        if (lastSnapshot) {
+          updateRunnerMesh(lastSnapshot);
+          updateUI(lastSnapshot);
+        }
+      } else {
+        if (jsRaceStatus === 'Countdown' || jsRaceStatus === 'Racing') {
+          if (!isPaused) {
+            lastSnapshot = updateJSRace(delta);
+          }
+          updateRunnerMesh(lastSnapshot);
+          updateUI(lastSnapshot);
+        }
+      }
+
+      controls.update();
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    // ============= Resize Handler =============
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>

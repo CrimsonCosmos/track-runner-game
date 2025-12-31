@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Runner - 100 Runners Benchmark</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            color: #eee;
+            overflow: hidden;
+        }
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        canvas { display: block; }
+
+        #stats {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 14px;
+            min-width: 280px;
+        }
+
+        #stats h2 {
+            margin-bottom: 10px;
+            color: #4ecdc4;
+            font-size: 16px;
+        }
+
+        #stats .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 5px 0;
+        }
+
+        #stats .stat-label { color: #888; }
+        #stats .stat-value { color: #fff; font-weight: bold; }
+        #stats .stat-value.good { color: #4ecdc4; }
+        #stats .stat-value.warning { color: #f9ca24; }
+        #stats .stat-value.bad { color: #ff6b6b; }
+
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 8px;
+        }
+
+        #controls button {
+            background: #4ecdc4;
+            border: none;
+            padding: 8px 16px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            color: #1a1a2e;
+        }
+
+        #controls button:hover {
+            background: #45b7aa;
+        }
+
+        #controls label {
+            display: block;
+            margin: 10px 0 5px;
+        }
+
+        #controls input[type="range"] {
+            width: 200px;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div id="stats">
+        <h2>100 Runner Benchmark</h2>
+        <div class="stat-row">
+            <span class="stat-label">FPS:</span>
+            <span class="stat-value" id="fps">--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Frame Time:</span>
+            <span class="stat-value" id="frame-time">-- ms</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Update Time:</span>
+            <span class="stat-value" id="update-time">-- ms</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Active Runners:</span>
+            <span class="stat-value" id="runner-count">--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Collision Checks:</span>
+            <span class="stat-value" id="collision-checks">--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Draw Calls:</span>
+            <span class="stat-value" id="draw-calls">--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Triangles:</span>
+            <span class="stat-value" id="triangles">--</span>
+        </div>
+        <hr style="margin: 10px 0; border-color: #333;">
+        <div class="stat-row">
+            <span class="stat-label">Old O(n²) checks:</span>
+            <span class="stat-value" id="old-checks" style="color: #ff6b6b;">--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Savings:</span>
+            <span class="stat-value good" id="savings">--%</span>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-reset">Reset Race</button>
+        <button id="btn-toggle">Pause</button>
+        <label>
+            Runner Count: <span id="runner-count-label">100</span>
+            <input type="range" id="runner-slider" min="10" max="128" value="100">
+        </label>
+        <label>
+            Time Scale: <span id="time-scale-label">10x</span>
+            <input type="range" id="time-slider" min="1" max="50" value="10">
+        </label>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { InstancedRunners, generate100Runners, generateFormation } from './js/performance/InstancedRunners.js';
+
+        // Track constants (simplified oval)
+        const STRAIGHT_LENGTH = 85;
+        const INNER_RADIUS = 36.5;
+        const LANE_WIDTH = 1.22;
+
+        // Get position on oval track
+        function getPosition(distance, lane) {
+            const lapLength = 400;
+            const d = ((distance % lapLength) + lapLength) % lapLength;
+            const laneRadius = INNER_RADIUS + lane * LANE_WIDTH;
+
+            let x, z, y = 0;
+
+            if (d < STRAIGHT_LENGTH) {
+                // First straight
+                x = d - STRAIGHT_LENGTH / 2;
+                z = -(laneRadius);
+            } else if (d < STRAIGHT_LENGTH + Math.PI * laneRadius) {
+                // First curve
+                const curveProgress = (d - STRAIGHT_LENGTH) / (Math.PI * laneRadius);
+                const angle = Math.PI * curveProgress;
+                x = STRAIGHT_LENGTH / 2 + Math.sin(angle) * laneRadius;
+                z = -Math.cos(angle) * laneRadius;
+            } else if (d < 2 * STRAIGHT_LENGTH + Math.PI * laneRadius) {
+                // Second straight
+                const straightProgress = d - STRAIGHT_LENGTH - Math.PI * laneRadius;
+                x = STRAIGHT_LENGTH / 2 - straightProgress;
+                z = laneRadius;
+            } else {
+                // Second curve
+                const curveStart = 2 * STRAIGHT_LENGTH + Math.PI * laneRadius;
+                const curveProgress = (d - curveStart) / (Math.PI * laneRadius);
+                const angle = Math.PI + Math.PI * curveProgress;
+                x = -STRAIGHT_LENGTH / 2 + Math.sin(angle) * laneRadius;
+                z = -Math.cos(angle) * laneRadius;
+            }
+
+            return { x, y, z };
+        }
+
+        // Scene setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x1a1a2e);
+        scene.fog = new THREE.Fog(0x1a1a2e, 100, 300);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 500);
+        camera.position.set(0, 60, 80);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        controls.update();
+
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+        scene.add(ambientLight);
+
+        const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+        directionalLight.position.set(50, 100, 50);
+        scene.add(directionalLight);
+
+        // Ground
+        const groundGeometry = new THREE.PlaneGeometry(200, 200);
+        const groundMaterial = new THREE.MeshStandardMaterial({
+            color: 0x2d5a27,
+            roughness: 0.9
+        });
+        const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+        ground.rotation.x = -Math.PI / 2;
+        scene.add(ground);
+
+        // Track surface
+        const trackGeometry = new THREE.RingGeometry(INNER_RADIUS, INNER_RADIUS + 10, 64);
+        const trackMaterial = new THREE.MeshStandardMaterial({
+            color: 0xcc4422,
+            roughness: 0.7
+        });
+        const track = new THREE.Mesh(trackGeometry, trackMaterial);
+        track.rotation.x = -Math.PI / 2;
+        track.position.y = 0.01;
+        scene.add(track);
+
+        // Track straights
+        const straightGeometry = new THREE.PlaneGeometry(STRAIGHT_LENGTH, 10);
+        const straight1 = new THREE.Mesh(straightGeometry, trackMaterial);
+        straight1.rotation.x = -Math.PI / 2;
+        straight1.position.set(0, 0.01, -(INNER_RADIUS + 5));
+        scene.add(straight1);
+
+        const straight2 = new THREE.Mesh(straightGeometry, trackMaterial);
+        straight2.rotation.x = -Math.PI / 2;
+        straight2.position.set(0, 0.01, INNER_RADIUS + 5);
+        scene.add(straight2);
+
+        // Create instanced runners
+        const runnerGeometry = new THREE.CapsuleGeometry(0.3, 1.2, 4, 8);
+        const instancedRunners = new InstancedRunners(scene, runnerGeometry, 128);
+        instancedRunners.setTrackPath(getPosition);
+
+        // State
+        let runnerCount = 100;
+        let timeScale = 10;
+        let paused = false;
+        let raceTime = 0;
+
+        function resetRace() {
+            // Remove old mesh and create new one
+            instancedRunners.state.activeCount = 0;
+
+            // Generate runners
+            const raceData = generate100Runners().slice(0, runnerCount);
+            const formation = generateFormation(runnerCount);
+
+            // Add runners
+            instancedRunners.addRunnersFromRaceData(raceData, formation);
+
+            // Reset positions
+            for (let i = 0; i < runnerCount; i++) {
+                const form = formation[i];
+                const startDist = -form.row * 1.5 - 8;
+                instancedRunners.state.resetRunner(i, startDist, form.laneOffset + 0.75);
+            }
+
+            raceTime = 0;
+        }
+
+        resetRace();
+
+        // FPS tracking
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fpsUpdateTime = 0;
+        let currentFPS = 0;
+        let frameTimeAvg = 0;
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const delta = (now - lastTime) / 1000;
+            lastTime = now;
+
+            // Update FPS
+            frameCount++;
+            fpsUpdateTime += delta;
+            if (fpsUpdateTime >= 0.5) {
+                currentFPS = frameCount / fpsUpdateTime;
+                frameTimeAvg = fpsUpdateTime / frameCount * 1000;
+                frameCount = 0;
+                fpsUpdateTime = 0;
+            }
+
+            if (!paused) {
+                raceTime += delta * timeScale;
+                instancedRunners.update(delta * timeScale, 1.0, 5000);
+            }
+
+            renderer.render(scene, camera);
+
+            // Update stats display
+            updateStats();
+        }
+
+        function updateStats() {
+            const stats = instancedRunners.getStats();
+            const rendererInfo = renderer.info;
+
+            // FPS coloring
+            const fpsEl = document.getElementById('fps');
+            fpsEl.textContent = currentFPS.toFixed(1);
+            fpsEl.className = 'stat-value ' + (currentFPS >= 55 ? 'good' : currentFPS >= 30 ? 'warning' : 'bad');
+
+            const frameTimeEl = document.getElementById('frame-time');
+            frameTimeEl.textContent = frameTimeAvg.toFixed(2) + ' ms';
+            frameTimeEl.className = 'stat-value ' + (frameTimeAvg <= 16.67 ? 'good' : frameTimeAvg <= 33 ? 'warning' : 'bad');
+
+            document.getElementById('update-time').textContent = stats.updateTimeMs + ' ms';
+            document.getElementById('runner-count').textContent = stats.activeRunners;
+            document.getElementById('collision-checks').textContent = stats.collisionChecks;
+            document.getElementById('draw-calls').textContent = rendererInfo.render.calls;
+            document.getElementById('triangles').textContent = rendererInfo.render.triangles.toLocaleString();
+
+            // Compare to O(n²)
+            const n = stats.activeRunners;
+            const oldChecks = n * (n - 1) / 2;
+            document.getElementById('old-checks').textContent = oldChecks.toLocaleString();
+
+            const savings = oldChecks > 0 ? ((1 - stats.collisionChecks / oldChecks) * 100).toFixed(1) : 0;
+            document.getElementById('savings').textContent = savings + '% reduction';
+        }
+
+        // Controls
+        document.getElementById('btn-reset').addEventListener('click', resetRace);
+
+        document.getElementById('btn-toggle').addEventListener('click', () => {
+            paused = !paused;
+            document.getElementById('btn-toggle').textContent = paused ? 'Resume' : 'Pause';
+        });
+
+        document.getElementById('runner-slider').addEventListener('input', (e) => {
+            runnerCount = parseInt(e.target.value);
+            document.getElementById('runner-count-label').textContent = runnerCount;
+            resetRace();
+        });
+
+        document.getElementById('time-slider').addEventListener('input', (e) => {
+            timeScale = parseInt(e.target.value);
+            document.getElementById('time-scale-label').textContent = timeScale + 'x';
+        });
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

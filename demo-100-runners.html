@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Track Runner - 100 Runners Demo</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: #1a1a2e;
+            overflow: hidden;
+        }
+        #canvas-container { width: 100vw; height: 100vh; }
+        canvas { display: block; }
+
+        #hud {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px;
+            border-radius: 8px;
+            color: #fff;
+            font-family: monospace;
+            font-size: 13px;
+            min-width: 260px;
+        }
+
+        #hud h2 {
+            color: #4ecdc4;
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 4px 0;
+        }
+
+        .stat-label { color: #888; }
+        .stat-value { color: #fff; font-weight: bold; }
+        .stat-value.good { color: #4ecdc4; }
+        .stat-value.warning { color: #f9ca24; }
+
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            padding: 15px;
+            border-radius: 8px;
+            color: #fff;
+        }
+
+        #controls button {
+            background: #4ecdc4;
+            border: none;
+            padding: 10px 20px;
+            margin: 5px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        #controls button:hover {
+            background: #45b7aa;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+
+    <div id="hud">
+        <h2>100 Runners - ECS Demo</h2>
+        <div class="stat-row">
+            <span class="stat-label">FPS:</span>
+            <span class="stat-value" id="fps">--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Frame Time:</span>
+            <span class="stat-value" id="frame-time">-- ms</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">ECS Update:</span>
+            <span class="stat-value" id="update-time">-- ms</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Runners:</span>
+            <span class="stat-value" id="runner-count">--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Collision Checks:</span>
+            <span class="stat-value" id="collision-checks">--</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Actual Collisions:</span>
+            <span class="stat-value" id="actual-collisions">--</span>
+        </div>
+        <hr style="margin: 10px 0; border-color: #333;">
+        <div class="stat-row">
+            <span class="stat-label">Race Time:</span>
+            <span class="stat-value" id="race-time">00:00</span>
+        </div>
+        <div class="stat-row">
+            <span class="stat-label">Leader Distance:</span>
+            <span class="stat-value" id="leader-distance">0m</span>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="btn-start">Start Race</button>
+        <button id="btn-reset">Reset</button>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { GameController } from './src/game/GameBridge.ts';
+        import { getPosition, buildTrack, STRAIGHT_LENGTH, INNER_RADIUS, TRACK_WIDTH } from './js/Track.js';
+
+        // Scene setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 100, 400);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(0, 80, 120);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        renderer.shadowMap.enabled = true;
+        container.appendChild(renderer.domElement);
+
+        const controls = new OrbitControls(camera, renderer.domElement);
+        controls.target.set(0, 0, 0);
+        controls.update();
+
+        // Lighting
+        const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+        scene.add(ambient);
+
+        const sun = new THREE.DirectionalLight(0xffffd0, 1.2);
+        sun.position.set(50, 100, 30);
+        sun.castShadow = true;
+        sun.shadow.mapSize.width = 2048;
+        sun.shadow.mapSize.height = 2048;
+        sun.shadow.camera.near = 10;
+        sun.shadow.camera.far = 300;
+        sun.shadow.camera.left = -100;
+        sun.shadow.camera.right = 100;
+        sun.shadow.camera.top = 100;
+        sun.shadow.camera.bottom = -100;
+        scene.add(sun);
+
+        const hemi = new THREE.HemisphereLight(0x87CEEB, 0x3d5c3d, 0.4);
+        scene.add(hemi);
+
+        // Build track
+        buildTrack(scene);
+
+        // Create game controller with 100 runners
+        const gameController = new GameController(scene, 128);
+
+        // Initialize with track path
+        gameController.initialize({ getPosition });
+
+        // Create instanced mesh renderer
+        gameController.createRenderer();
+
+        // Set up race with 100 runners
+        gameController.setupRace(100);
+
+        // Game state
+        let raceStarted = false;
+        let raceTime = 0;
+        const timeScaleFactor = 10; // 10x speed for demo
+
+        // FPS tracking
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fpsUpdateTime = 0;
+        let currentFPS = 0;
+        let frameTimeAvg = 0;
+
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+
+            const now = performance.now();
+            const delta = (now - lastTime) / 1000;
+            lastTime = now;
+
+            // FPS calculation
+            frameCount++;
+            fpsUpdateTime += delta;
+            if (fpsUpdateTime >= 0.5) {
+                currentFPS = frameCount / fpsUpdateTime;
+                frameTimeAvg = fpsUpdateTime / frameCount * 1000;
+                frameCount = 0;
+                fpsUpdateTime = 0;
+            }
+
+            // Update game if race started
+            if (raceStarted) {
+                raceTime += delta;
+                gameController.update(delta * timeScaleFactor, 1.0, 5000);
+            }
+
+            renderer.render(scene, camera);
+            updateHUD();
+        }
+
+        function updateHUD() {
+            const stats = gameController.getStats();
+
+            // FPS
+            const fpsEl = document.getElementById('fps');
+            fpsEl.textContent = currentFPS.toFixed(1);
+            fpsEl.className = 'stat-value ' + (currentFPS >= 55 ? 'good' : 'warning');
+
+            // Frame time
+            const frameEl = document.getElementById('frame-time');
+            frameEl.textContent = frameTimeAvg.toFixed(2) + ' ms';
+            frameEl.className = 'stat-value ' + (frameTimeAvg <= 16.67 ? 'good' : 'warning');
+
+            document.getElementById('update-time').textContent = stats.updateTimeMs.toFixed(2) + ' ms';
+            document.getElementById('runner-count').textContent = stats.activeRunners;
+            document.getElementById('collision-checks').textContent = stats.collisionChecks;
+            document.getElementById('actual-collisions').textContent = stats.actualCollisions;
+
+            // Race time
+            const mins = Math.floor(raceTime / 60);
+            const secs = Math.floor(raceTime % 60);
+            document.getElementById('race-time').textContent =
+                `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+
+            // Leader distance
+            let maxDist = 0;
+            const pos = gameController.world.components.position;
+            for (let i = 0; i < stats.activeRunners; i++) {
+                if (pos.distance[i] > maxDist) maxDist = pos.distance[i];
+            }
+            document.getElementById('leader-distance').textContent = Math.floor(maxDist) + 'm';
+        }
+
+        // Controls
+        document.getElementById('btn-start').addEventListener('click', () => {
+            raceStarted = true;
+            document.getElementById('btn-start').textContent = raceStarted ? 'Racing...' : 'Start Race';
+        });
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            raceStarted = false;
+            raceTime = 0;
+            gameController.setupRace(100);
+            document.getElementById('btn-start').textContent = 'Start Race';
+        });
+
+        // Resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        animate();
+    </script>
+</body>
+</html>

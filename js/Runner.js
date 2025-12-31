@@ -20,16 +20,27 @@ export const RUNNER_COLORS = [
     0x8822cc  // Purple
 ];
 
-// Budapest 2023 World Championships 5000m Final - Top 7 splits
-export const RACE_DATA = [
-    { name: "Ingebrigtsen", splits: [157, 315, 472, 650, 791.3], finalTime: 791.3 },
-    { name: "Katir", splits: [156, 313, 471, 650, 791.44], finalTime: 791.44 },
-    { name: "Krop", splits: [156, 314, 472, 650, 792.28], finalTime: 792.28 },
-    { name: "Grijalva", splits: [156, 314, 471, 648, 792.50], finalTime: 792.50 },
-    { name: "Kejelcha", splits: [156, 314, 472, 650, 792.51], finalTime: 792.51 },
-    { name: "Gebrhiwet", splits: [156, 314, 471, 650, 792.65], finalTime: 792.65 },
-    { name: "Ahmed", splits: [156, 314, 472, 651, 792.92], finalTime: 792.92 }
+// 1600m Race Data - Based on 2023-2024 Elite Mile Races
+// Splits are in seconds at 400m, 800m, 1200m, 1600m
+export const RACE_DATA_1600 = [
+    // Jakob Ingebrigtsen - 3:43.73 (Prefontaine 2023)
+    { name: "Ingebrigtsen", splits: [55.2, 111.8, 168.9, 223.73], finalTime: 223.73 },
+    // Yared Nuguse - 3:43.97 (American Record, Prefontaine 2023)
+    { name: "Nuguse", splits: [55.3, 112.0, 169.2, 223.97], finalTime: 223.97 },
+    // Josh Kerr - 3:45.34 (2023)
+    { name: "Kerr", splits: [55.5, 112.4, 169.8, 225.34], finalTime: 225.34 },
+    // Cole Hocker - 3:47.40 (2024 Olympic 1500m champion, extrapolated)
+    { name: "Hocker", splits: [56.0, 113.2, 170.8, 227.40], finalTime: 227.40 },
+    // Timothy Cheruiyot - 3:48.12 (2023)
+    { name: "Cheruiyot", splits: [56.2, 113.6, 171.4, 228.12], finalTime: 228.12 },
+    // George Mills - 3:49.20 (2024)
+    { name: "Mills", splits: [56.4, 114.0, 172.2, 229.20], finalTime: 229.20 },
+    // Neil Gourley - 3:49.68 (2024)
+    { name: "Gourley", splits: [56.5, 114.2, 172.6, 229.68], finalTime: 229.68 }
 ];
+
+// Legacy RACE_DATA for backward compatibility (points to 1600m data)
+export const RACE_DATA = RACE_DATA_1600;
 
 // Shuffle array utility
 export function shuffleArray(array) {
@@ -42,18 +53,22 @@ export function shuffleArray(array) {
 }
 
 // Calculate target speed at a given distance based on splits
+// Works with 400m segment splits for 1600m race
 export function getTargetSpeed(raceDataEntry, distance, timeScaleFactor) {
     const splits = raceDataEntry.splits;
-    const segmentIndex = Math.min(Math.floor(distance / 1000), 4);
+    // 400m segments: 0-400, 400-800, 800-1200, 1200-1600
+    const segmentIndex = Math.min(Math.floor(distance / 400), 3);
     const timeAtStart = segmentIndex === 0 ? 0 : splits[segmentIndex - 1];
     const timeAtEnd = splits[segmentIndex];
     const segmentTime = timeAtEnd - timeAtStart;
-    return (1000 / segmentTime) / timeScaleFactor;
+    // Speed = distance / time, adjusted by timeScaleFactor
+    return (400 / segmentTime) / timeScaleFactor;
 }
 
-// Cooldown speed after finishing
+// Cooldown speed after finishing (slow jog)
 export function getCooldownSpeed(timeScaleFactor) {
-    return (5000 / 791.3 / 2) / timeScaleFactor;
+    // About 3 m/s jog speed
+    return 3.0 / timeScaleFactor;
 }
 
 // Runner class
@@ -71,6 +86,15 @@ export class Runner {
         this.raceData = raceData;
         this.currentSpeed = 0;
         this.targetSpeed = 0;
+
+        // Lane locking for 400m/relay (stay in assigned lane)
+        this.stayInLane = false;
+        this.assignedLane = lane;
+        this.assignedLanePosition = lane;
+
+        // Waterfall break for 1600m (after first curve, break to lane 1)
+        this.waterfallBroken = false;
+        this.waterfallBreakDistance = 100; // Break after 100m
 
         // Random stride multiplier (0.85-1.15)
         this.strideMultiplier = 0.85 + Math.random() * 0.3;
@@ -173,6 +197,25 @@ export class Runner {
     }
 
     updateLanePosition(delta, allRunners) {
+        // Lane locking: stay in assigned lane for 400m/relay
+        if (this.stayInLane) {
+            // Lock to assigned lane position
+            this.lanePosition = this.assignedLanePosition;
+            return;
+        }
+
+        // Waterfall break: after break distance, can drift to lane 1
+        if (!this.waterfallBroken && this.distance >= this.waterfallBreakDistance) {
+            this.waterfallBroken = true;
+            // Now can drift normally
+        }
+
+        // Before waterfall break, stay in lane
+        if (!this.waterfallBroken && this.waterfallBreakDistance > 0) {
+            this.lanePosition = this.assignedLanePosition;
+            return;
+        }
+
         let blockedByRunner = null;
         let canDriftInside = true;
 
@@ -202,6 +245,35 @@ export class Runner {
             const driftAmount = DRIFT_LEFT_SPEED * delta * driftMultiplier;
             this.lanePosition = Math.max(this.lanePosition - driftAmount, MIN_LANE_POSITION);
         }
+    }
+
+    // Set lane lock mode
+    setLaneLock(stayInLane, assignedLane, assignedLanePosition) {
+        this.stayInLane = stayInLane;
+        this.assignedLane = assignedLane;
+        this.assignedLanePosition = assignedLanePosition;
+    }
+
+    // Set waterfall mode for 1600m
+    setWaterfallMode(breakDistance) {
+        this.waterfallBreakDistance = breakDistance;
+        this.waterfallBroken = false;
+    }
+
+    // Check if runner is drafting behind another
+    isDraftingBehind(allRunners) {
+        for (const other of allRunners) {
+            if (other === this) continue;
+
+            const distanceDiff = other.distance - this.distance;
+            const laneDiff = Math.abs(this.lanePosition - other.lanePosition);
+
+            // Behind someone (0.5-2m) and in same lane area
+            if (distanceDiff > 0.5 && distanceDiff < 2.0 && laneDiff < 0.3) {
+                return true;
+            }
+        }
+        return false;
     }
 
     squish() {

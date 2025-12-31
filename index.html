@@ -145,15 +145,17 @@
             justify-content: center;
             font-size: 28px;
             font-family: 'Courier New', monospace;
-            color: #666;
+            color: #ffffff;
             scroll-snap-align: center;
             cursor: pointer;
             transition: color 0.2s, transform 0.2s;
+            opacity: 0.5;
         }
         .scroll-option.selected {
-            color: #fff;
+            color: #4CAF50;
             font-weight: bold;
-            transform: scale(1.1);
+            transform: scale(1.2);
+            opacity: 1;
         }
         .time-separator {
             font-size: 36px;
@@ -340,6 +342,347 @@
             font-family: 'Arial', sans-serif;
             font-size: 11px;
             margin-top: 5px;
+        }
+        /* Race Mode UI Elements */
+        #energyBarContainer {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 400px;
+            z-index: 100;
+            display: none;
+        }
+        #energyLabel {
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 14px;
+            font-weight: bold;
+            text-align: center;
+            margin-bottom: 5px;
+            text-shadow: 1px 1px 2px black;
+        }
+        #energyBar {
+            width: 100%;
+            height: 24px;
+            background: rgba(0,0,0,0.7);
+            border-radius: 12px;
+            overflow: hidden;
+            border: 2px solid rgba(255,255,255,0.3);
+        }
+        #energyFill {
+            height: 100%;
+            width: 0%;
+            background: #00ff00;
+            transition: width 0.1s, background-color 0.3s;
+            border-radius: 10px;
+        }
+        #mphDisplay {
+            position: absolute;
+            top: 20px;
+            right: 80px;
+            color: white;
+            font-family: 'Courier New', monospace;
+            font-size: 28px;
+            font-weight: bold;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 20px;
+            border-radius: 8px;
+            z-index: 100;
+            display: none;
+        }
+        #legCounter, #lapCounter {
+            position: absolute;
+            top: 80px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 32px;
+            font-weight: bold;
+            background: rgba(0,0,0,0.7);
+            padding: 10px 25px;
+            border-radius: 8px;
+            z-index: 100;
+            display: none;
+        }
+        #exchangeZoneIndicator {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            color: #ffff00;
+            font-family: 'Arial', sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            z-index: 100;
+            display: none;
+            animation: pulse 0.5s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        #dnfOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.9);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 200;
+            flex-direction: column;
+        }
+        #dnfOverlay h1 {
+            color: #ff3333;
+            font-family: 'Arial', sans-serif;
+            font-size: 72px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+        #dnfOverlay p {
+            color: white;
+            font-family: 'Arial', sans-serif;
+            font-size: 24px;
+        }
+        /* Winner Celebration */
+        #winnerOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 250;
+            pointer-events: none;
+        }
+        #winnerText {
+            color: #00ff00;
+            font-family: 'Arial', sans-serif;
+            font-size: 96px;
+            font-weight: bold;
+            text-shadow:
+                0 0 20px #00ff00,
+                0 0 40px #00ff00,
+                0 0 60px #00ff00,
+                4px 4px 0 #006600;
+            animation: winnerPulse 0.5s ease-in-out infinite alternate;
+        }
+        @keyframes winnerPulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.1); }
+        }
+        #confettiCanvas {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 240;
+        }
+        /* Game Lobby Panel - Right side overlay */
+        #gameLobbyModal {
+            position: fixed;
+            top: 0;
+            right: 0;
+            width: 320px;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            flex-direction: column;
+            z-index: 300;
+            border-left: 2px solid #333;
+        }
+        #gameLobbyModal.fullscreen {
+            /* Fullscreen mode for joining players waiting */
+            width: 100%;
+            left: 0;
+            justify-content: center;
+            align-items: center;
+            border-left: none;
+        }
+        .lobby-content {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+        #gameLobbyModal.fullscreen .lobby-content {
+            max-width: 400px;
+            height: auto;
+            background: #222;
+            border-radius: 16px;
+            padding: 30px;
+        }
+        .lobby-content h2 {
+            color: white;
+            margin-bottom: 10px;
+            font-size: 18px;
+            text-align: center;
+        }
+        .lobby-code-section {
+            text-align: center;
+            margin-bottom: 15px;
+        }
+        .lobby-code-section p {
+            color: #888;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        .lobby-code {
+            font-size: 36px;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #00ff00;
+            letter-spacing: 8px;
+            background: #111;
+            padding: 10px 20px;
+            border-radius: 8px;
+            text-shadow: 0 0 10px #00ff00;
+            display: inline-block;
+        }
+        .lobby-info {
+            display: flex;
+            justify-content: space-between;
+            color: #888;
+            font-size: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #333;
+            margin-bottom: 10px;
+        }
+        .lobby-players {
+            background: #111;
+            border-radius: 8px;
+            padding: 10px;
+            flex: 1;
+            overflow-y: auto;
+            margin-bottom: 15px;
+        }
+        .lobby-players h3 {
+            color: #aaa;
+            font-size: 14px;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .lobby-player {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: #1a1a1a;
+            border-radius: 6px;
+            margin-bottom: 6px;
+        }
+        .lobby-player:last-child {
+            margin-bottom: 0;
+        }
+        .lobby-player-icon {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: #333;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-right: 10px;
+            font-size: 16px;
+        }
+        .lobby-player-name {
+            color: white;
+            flex: 1;
+        }
+        .lobby-player-host {
+            color: #00ff00;
+            font-size: 12px;
+            padding: 2px 8px;
+            background: rgba(0, 255, 0, 0.2);
+            border-radius: 4px;
+        }
+        .lobby-player-lane {
+            color: #666;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .player-status {
+            font-size: 12px;
+            padding: 2px 8px;
+            border-radius: 4px;
+            margin-left: auto;
+        }
+        .player-status.ready {
+            color: #00ff00;
+            background: rgba(0, 255, 0, 0.2);
+        }
+        .player-status.waiting {
+            color: #ffaa00;
+            background: rgba(255, 170, 0, 0.2);
+        }
+        .player-status.host-status {
+            color: #ffdd00;
+            background: rgba(255, 221, 0, 0.2);
+            font-weight: bold;
+        }
+        .lobby-btn.start.can-start {
+            background: #22cc22;
+            animation: pulse-green 1s infinite;
+        }
+        @keyframes pulse-green {
+            0%, 100% { box-shadow: 0 0 5px #22cc22; }
+            50% { box-shadow: 0 0 20px #22cc22; }
+        }
+        .lobby-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: auto;
+        }
+        .lobby-btn {
+            padding: 15px 20px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            width: 100%;
+        }
+        .lobby-btn.start {
+            background: #444;
+            color: #888;
+        }
+        .lobby-btn.start.can-start {
+            background: #22cc22;
+            color: white;
+        }
+        .lobby-btn.back {
+            background: #333;
+            color: #aaa;
+        }
+        .lobby-btn.back:hover {
+            background: #444;
+        }
+        .lobby-waiting {
+            color: #ffaa00;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .connecting-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #333;
+            border-top-color: #00ff00;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 10px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
         #settingsButton {
             position: absolute;
@@ -544,29 +887,1580 @@
             border-radius: 6px;
             cursor: pointer;
         }
+
+        /* Name Entry Styles */
+        #nameEntryModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 360;
+        }
+        #nameEntryForm {
+            background: #222;
+            padding: 40px 50px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        #nameEntryForm h2 {
+            margin: 0 0 10px 0;
+            font-size: 32px;
+        }
+        #nameEntryForm p {
+            margin: 0 0 25px 0;
+            color: #888;
+            font-size: 14px;
+        }
+        #playerNameInput {
+            width: 280px;
+            padding: 15px 20px;
+            font-size: 24px;
+            font-family: 'Arial', sans-serif;
+            text-align: center;
+            background: #111;
+            border: 2px solid #444;
+            border-radius: 8px;
+            color: white;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+        #playerNameInput:focus {
+            border-color: #4CAF50;
+        }
+        #playerNameInput::placeholder {
+            color: #555;
+        }
+        #nameEntrySubmit {
+            margin-top: 25px;
+            padding: 15px 50px;
+            font-size: 18px;
+            font-weight: bold;
+            background: #22cc22;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        #nameEntrySubmit:hover {
+            background: #1ea01e;
+        }
+        #nameEntrySubmit:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        /* Main Menu Styles */
+        #mainMenuModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 350;
+        }
+        #mainMenuForm {
+            text-align: center;
+            color: white;
+            font-family: 'Arial', sans-serif;
+        }
+        #mainMenuForm h1 {
+            font-size: 48px;
+            margin: 0 0 10px 0;
+            text-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .menu-subtitle {
+            font-size: 18px;
+            color: #888;
+            margin: 0 0 40px 0;
+        }
+        .menu-options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            min-width: 350px;
+        }
+        .menu-option {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            padding: 20px 25px;
+            background: rgba(255,255,255,0.1);
+            border: 2px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: left;
+            position: relative;
+            color: white;
+        }
+        .menu-option:hover:not(.disabled) {
+            background: rgba(255,255,255,0.15);
+            border-color: #4CAF50;
+            transform: translateX(5px);
+        }
+        .menu-option.selected {
+            background: rgba(76, 175, 80, 0.3);
+            border-color: #4CAF50;
+            box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
+        }
+        .menu-option:active:not(.disabled) {
+            transform: translateX(5px) scale(0.98);
+        }
+        .menu-option.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .menu-option-icon {
+            font-size: 32px;
+            width: 50px;
+            text-align: center;
+        }
+        .menu-option-text {
+            flex: 1;
+        }
+        .menu-option-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 4px;
+        }
+        .menu-option-desc {
+            font-size: 13px;
+            color: #aaa;
+        }
+        .coming-soon-badge {
+            position: absolute;
+            top: -8px;
+            right: 15px;
+            background: #ff6b6b;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            padding: 4px 8px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+        }
+
+        /* Join Game Modal */
+        #joinGameModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 350;
+        }
+        #joinGameForm {
+            background: #222;
+            padding: 40px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        #joinGameForm h2 {
+            margin: 0 0 10px 0;
+            font-size: 28px;
+        }
+        #joinGameForm p {
+            margin: 10px 0;
+            color: #aaa;
+            font-size: 14px;
+        }
+        .code-input-container {
+            margin: 25px 0;
+        }
+        #gameCodeInput:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        /* Character Selection */
+        #characterSelectModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 350;
+        }
+        #characterSelectForm {
+            background: #222;
+            padding: 35px 45px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        #characterSelectForm h2 {
+            margin: 0 0 8px 0;
+            font-size: 28px;
+        }
+        #characterSelectForm p {
+            margin: 0 0 25px 0;
+            color: #888;
+            font-size: 14px;
+        }
+        .character-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        .character-option {
+            background: #333;
+            border: 3px solid #444;
+            border-radius: 12px;
+            padding: 20px 15px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        .character-option:hover {
+            background: #3a3a3a;
+            transform: translateY(-3px);
+            border-color: #555;
+        }
+        .character-option.selected {
+            border-color: #4CAF50;
+            background: #2a3a2a;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+        }
+        .character-option.taken {
+            opacity: 0.4;
+            cursor: not-allowed;
+            pointer-events: none;
+            border-color: #666;
+        }
+        .character-option.taken::after {
+            content: 'TAKEN';
+            display: block;
+            font-size: 10px;
+            color: #ff6666;
+            margin-top: 5px;
+            font-weight: bold;
+        }
+        .character-option.default-runner {
+            border-color: #888;
+        }
+        .character-preview {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+        .character-name {
+            font-size: 14px;
+            font-weight: bold;
+            color: #ddd;
+        }
+        .char-btn {
+            padding: 12px 30px;
+            font-size: 16px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+        }
+        .back-btn {
+            background: #444;
+            color: white;
+        }
+        .back-btn:hover {
+            background: #555;
+        }
+        .confirm-btn {
+            background: #4CAF50;
+            color: white;
+        }
+        .confirm-btn:hover {
+            background: #45a049;
+        }
+
+        /* Race Mode Selection */
+        #raceModeModal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 350;
+        }
+        #raceModeForm {
+            background: #222;
+            padding: 35px 45px;
+            border-radius: 16px;
+            text-align: center;
+            color: white;
+            font-family: 'Arial', sans-serif;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+        }
+        #raceModeForm h2 {
+            margin: 0 0 8px 0;
+            font-size: 28px;
+        }
+        #raceModeForm p {
+            margin: 0 0 25px 0;
+            color: #888;
+            font-size: 14px;
+        }
+        .race-mode-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        .race-mode-option {
+            background: #333;
+            border: 3px solid #444;
+            border-radius: 12px;
+            padding: 25px 20px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            min-width: 140px;
+        }
+        .race-mode-option:hover {
+            background: #3a3a3a;
+            transform: translateY(-3px);
+            border-color: #555;
+        }
+        .race-mode-option.selected {
+            border-color: #4CAF50;
+            background: #2a3a2a;
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.3);
+        }
+        .race-mode-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        .race-mode-name {
+            font-size: 16px;
+            font-weight: bold;
+            color: #ddd;
+            margin-bottom: 5px;
+        }
+        .race-mode-desc {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.3;
+        }
+
+        /* Race Countdown Overlay */
+        #countdownOverlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 500;
+            pointer-events: none;
+        }
+        #countdownText {
+            font-family: 'Arial Black', 'Arial', sans-serif;
+            font-size: 200px;
+            font-weight: 900;
+            color: white;
+            text-shadow:
+                0 0 40px rgba(255, 255, 255, 0.8),
+                0 0 80px rgba(255, 255, 255, 0.4),
+                8px 8px 0 #000;
+            animation: countdownPulse 0.5s ease-out;
+        }
+        #countdownText.bang {
+            color: #ff3300;
+            font-size: 160px;
+            text-shadow:
+                0 0 60px rgba(255, 51, 0, 0.9),
+                0 0 120px rgba(255, 51, 0, 0.6),
+                0 0 180px rgba(255, 51, 0, 0.3),
+                8px 8px 0 #000;
+            animation: bangFlash 0.3s ease-out;
+        }
+        @keyframes countdownPulse {
+            0% { transform: scale(1.5); opacity: 0; }
+            50% { transform: scale(1.1); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes bangFlash {
+            0% { transform: scale(2); opacity: 0; }
+            30% { transform: scale(1.2); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        #countdownFlash {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 499;
+        }
+        #countdownFlash.flash {
+            animation: screenFlash 0.15s ease-out;
+        }
+        @keyframes screenFlash {
+            0% { opacity: 0.8; }
+            100% { opacity: 0; }
+        }
     </style>
 </head>
 <body>
-    <div id="goalTimeModal">
+    <!-- Focus warning shown when tab loses focus during race -->
+    <div id="focusWarning" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        background: rgba(255, 100, 0, 0.95); color: white; padding: 30px 50px; border-radius: 15px; z-index: 9999;
+        font-family: Arial, sans-serif; font-size: 24px; text-align: center; box-shadow: 0 0 30px rgba(255, 100, 0, 0.5);">
+        <div style="font-size: 48px; margin-bottom: 10px;">⚠️</div>
+        <div>Click here to resume!</div>
+        <div style="font-size: 14px; margin-top: 10px; opacity: 0.8;">This tab needs focus for keyboard controls</div>
+    </div>
+
+    <div id="nameEntryModal">
+        <div id="nameEntryForm">
+            <h2>Track Runner</h2>
+            <p>Enter your name</p>
+            <input type="text" id="playerNameInput" placeholder="Your Name" maxlength="16" autocomplete="off">
+            <br>
+            <button id="nameEntrySubmit" onclick="submitPlayerName()">Continue</button>
+        </div>
+    </div>
+
+    <script>
+        window.playerName = '';
+
+        function submitPlayerName() {
+            const nameInput = document.getElementById('playerNameInput');
+            const name = nameInput.value.trim();
+
+            if (name.length < 1) {
+                nameInput.style.borderColor = '#ff4444';
+                nameInput.placeholder = 'Please enter a name';
+                return;
+            }
+
+            window.playerName = name;
+            console.log('Player name set to:', window.playerName);
+
+            document.getElementById('nameEntryModal').style.display = 'none';
+            document.getElementById('mainMenuModal').style.display = 'flex';
+        }
+
+        // Allow Enter key to submit
+        document.addEventListener('DOMContentLoaded', function() {
+            const nameInput = document.getElementById('playerNameInput');
+            nameInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    submitPlayerName();
+                }
+            });
+            // Reset border color on typing
+            nameInput.addEventListener('input', function() {
+                this.style.borderColor = '#444';
+            });
+        });
+    </script>
+
+    <div id="mainMenuModal" style="display: none;">
+        <div id="mainMenuForm">
+            <h1>🏃 Track Runner</h1>
+            <p class="menu-subtitle">Choose Your Race</p>
+            <div class="menu-options">
+                <button class="menu-option" id="createLocalGame" data-mode="create" onclick="selectGameMode(this)">
+                    <div class="menu-option-icon">🎮</div>
+                    <div class="menu-option-text">
+                        <div class="menu-option-title">Create Local Game</div>
+                        <div class="menu-option-desc">Host a race on your device</div>
+                    </div>
+                </button>
+                <button class="menu-option" id="joinLocalGame" data-mode="join" onclick="selectGameMode(this)">
+                    <div class="menu-option-icon">🔗</div>
+                    <div class="menu-option-text">
+                        <div class="menu-option-title">Join Local Game</div>
+                        <div class="menu-option-desc">Connect to a nearby host</div>
+                    </div>
+                </button>
+                <button class="menu-option disabled" id="onlineMultiplayer" disabled>
+                    <div class="menu-option-icon">🌐</div>
+                    <div class="menu-option-text">
+                        <div class="menu-option-title">Online Multiplayer</div>
+                        <div class="menu-option-desc">Coming Soon</div>
+                    </div>
+                    <span class="coming-soon-badge">COMING SOON</span>
+                </button>
+            </div>
+            <div style="display: flex; justify-content: center; margin-top: 25px;">
+                <button id="mainMenuContinue" onclick="confirmGameMode()" style="padding: 15px 40px; font-size: 18px; font-weight: bold; background: #22cc22; color: white; border: none; border-radius: 8px; cursor: pointer;">Continue</button>
+            </div>
+        </div>
+    </div>
+    <script>
+        let selectedGameMode = null;
+
+        function selectGameMode(element) {
+            document.querySelectorAll('.menu-option:not(.disabled)').forEach(opt => opt.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedGameMode = element.dataset.mode;
+        }
+
+        function confirmGameMode() {
+            if (!selectedGameMode) {
+                alert('Please select a game mode!');
+                return;
+            }
+            document.getElementById('mainMenuModal').style.display = 'none';
+            if (selectedGameMode === 'create') {
+                document.getElementById('characterSelectModal').style.display = 'flex';
+            } else if (selectedGameMode === 'join') {
+                document.getElementById('joinGameModal').style.display = 'flex';
+            }
+        }
+    </script>
+
+    <div id="characterSelectModal" style="display: none;">
+        <div id="characterSelectForm">
+            <h2>Choose Your Runner</h2>
+            <p id="characterSelectSubtitle">Select a character to play as</p>
+            <div class="character-grid">
+                <div class="character-option" data-character="trump" onclick="selectCharacter(this)">
+                    <div class="character-preview">🧔</div>
+                    <div class="character-name">Trump</div>
+                </div>
+                <div class="character-option" data-character="musk" onclick="selectCharacter(this)">
+                    <div class="character-preview">🚀</div>
+                    <div class="character-name">Musk</div>
+                </div>
+                <div class="character-option" data-character="stalin" onclick="selectCharacter(this)">
+                    <div class="character-preview">☭</div>
+                    <div class="character-name">Stalin</div>
+                </div>
+                <div class="character-option" data-character="skeleton" onclick="selectCharacter(this)">
+                    <div class="character-preview">💀</div>
+                    <div class="character-name">Skeleton</div>
+                </div>
+                <div class="character-option" data-character="snowman" onclick="selectCharacter(this)">
+                    <div class="character-preview">⛄</div>
+                    <div class="character-name">Snowman</div>
+                </div>
+                <div class="character-option" data-character="demon" onclick="selectCharacter(this)">
+                    <div class="character-preview">👹</div>
+                    <div class="character-name">Demon</div>
+                </div>
+                <div class="character-option default-runner" data-character="default" onclick="selectCharacter(this)" style="display: none;">
+                    <div class="character-preview">🏃</div>
+                    <div class="character-name">Default Runner</div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 25px;">
+                <button id="characterBackBtn" onclick="handleCharacterBack()" class="char-btn back-btn">Back</button>
+                <button id="characterSelectSubmit" onclick="confirmCharacter()" class="char-btn confirm-btn">Continue</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedCharacter = null;
+        let isSelectingForJoin = false;
+        let availableCharacters = ['trump', 'musk', 'stalin', 'skeleton', 'snowman', 'demon'];
+
+        // Character model paths
+        const CHARACTER_MODELS = {
+            trump: { path: 'public/characters/trump/source/Running.fbx', name: 'Trump' },
+            musk: { path: 'public/characters/musk.fbx', name: 'Musk' },
+            stalin: { path: 'public/characters/stalin.fbx', name: 'Stalin' },
+            skeleton: { path: 'public/characters/skeleton.fbx', name: 'Skeleton' },
+            snowman: { path: 'public/characters/snowman.fbx', name: 'Snowman' },
+            demon: { path: 'public/characters/demon.fbx', name: 'Demon' },
+            default: { path: null, name: 'Default Runner', isDefault: true }
+        };
+
+        function selectCharacter(element) {
+            // Don't allow selecting taken characters
+            if (element.classList.contains('taken')) return;
+
+            document.querySelectorAll('.character-option').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedCharacter = element.dataset.character;
+        }
+
+        function handleCharacterBack() {
+            document.getElementById('characterSelectModal').style.display = 'none';
+            resetCharacterSelect();
+
+            if (isSelectingForJoin) {
+                // Go back to join modal
+                if (networkManager) {
+                    networkManager.disconnect();
+                }
+                document.getElementById('joinGameModal').style.display = 'flex';
+                isSelectingForJoin = false;
+            } else {
+                document.getElementById('mainMenuModal').style.display = 'flex';
+            }
+        }
+
+        function resetCharacterSelect() {
+            selectedCharacter = null;
+            availableCharacters = ['trump', 'musk', 'stalin', 'skeleton', 'snowman', 'demon'];
+
+            // Reset all character options
+            document.querySelectorAll('.character-option').forEach(el => {
+                el.classList.remove('selected', 'taken');
+            });
+
+            // Hide default runner option
+            const defaultOption = document.querySelector('.character-option[data-character="default"]');
+            if (defaultOption) defaultOption.style.display = 'none';
+
+            // Reset button text and subtitle
+            document.getElementById('characterSelectSubmit').textContent = 'Continue';
+            document.getElementById('characterSelectSubtitle').textContent = 'Select a character to play as';
+        }
+
+        function showCharacterSelectForJoin(availableChars) {
+            isSelectingForJoin = true;
+            availableCharacters = availableChars;
+
+            // Mark taken characters
+            document.querySelectorAll('.character-option').forEach(el => {
+                const char = el.dataset.character;
+                if (char === 'default') {
+                    // Show default option only if all characters are taken
+                    if (availableChars.length === 0) {
+                        el.style.display = 'block';
+                        el.classList.remove('taken');
+                    } else {
+                        el.style.display = 'none';
+                    }
+                } else if (!availableChars.includes(char)) {
+                    el.classList.add('taken');
+                } else {
+                    el.classList.remove('taken');
+                }
+            });
+
+            // Update UI for join mode
+            document.getElementById('characterSelectSubmit').textContent = 'Ready';
+            if (availableChars.length === 0) {
+                document.getElementById('characterSelectSubtitle').textContent = 'All characters taken - use default runner';
+            } else {
+                document.getElementById('characterSelectSubtitle').textContent = 'Select an available character';
+            }
+
+            document.getElementById('characterSelectModal').style.display = 'flex';
+        }
+
+        function confirmCharacter() {
+            if (!selectedCharacter) {
+                alert('Please select a character!');
+                return;
+            }
+
+            const isDefaultCharacter = selectedCharacter === 'default';
+
+            // Store selected character info globally
+            window.playerCharacter = selectedCharacter;
+            window.playerCharacterModel = CHARACTER_MODELS[selectedCharacter];
+            window.isDefaultCharacter = isDefaultCharacter;
+            console.log('Selected character:', window.playerCharacterModel);
+
+            // Start loading the character model early (if not default)
+            if (!isDefaultCharacter && window.loadPlayerCharacter) {
+                window.loadPlayerCharacter();
+            }
+
+            document.getElementById('characterSelectModal').style.display = 'none';
+
+            // Check if we're joining a game
+            if (isSelectingForJoin && window.pendingRoomCode) {
+                // Send ready status with character choice
+                networkManager.sendReady(selectedCharacter, isDefaultCharacter);
+
+                // Show lobby
+                document.getElementById('gameLobbyModal').style.display = 'flex';
+                updateLobbyPlayerList();
+
+                isSelectingForJoin = false;
+                window.pendingRoomCode = null;
+            } else {
+                // Normal flow - go to race mode selection
+                document.getElementById('raceModeModal').style.display = 'flex';
+            }
+        }
+    </script>
+
+    <!-- Race Mode Selection Modal -->
+    <div id="raceModeModal" style="display: none;">
+        <div id="raceModeForm">
+            <h2>Choose Your Race</h2>
+            <p>Select a race distance</p>
+            <div class="race-mode-grid">
+                <div class="race-mode-option" data-mode="relay_4x100" onclick="selectRaceMode(this)">
+                    <div class="race-mode-icon">🏃‍♂️🏃‍♂️</div>
+                    <div class="race-mode-name">4x100m Relay</div>
+                    <div class="race-mode-desc">Mash spacebar to sprint!<br>Time your handoffs perfectly</div>
+                </div>
+                <div class="race-mode-option" data-mode="sprint_400" onclick="selectRaceMode(this)">
+                    <div class="race-mode-icon">⚡</div>
+                    <div class="race-mode-name">400m Sprint</div>
+                    <div class="race-mode-desc">One lap, all out!<br>Manage your lactic acid</div>
+                </div>
+                <div class="race-mode-option" data-mode="mile_1600" onclick="selectRaceMode(this)">
+                    <div class="race-mode-icon">🏅</div>
+                    <div class="race-mode-name">1600m (Mile)</div>
+                    <div class="race-mode-desc">4 laps of strategy<br>Draft and kick to win</div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 25px;">
+                <button onclick="document.getElementById('raceModeModal').style.display='none'; document.getElementById('characterSelectModal').style.display='flex';" class="char-btn back-btn">Back</button>
+                <button id="raceModeSubmit" onclick="confirmRaceMode()" class="char-btn confirm-btn">Solo Race</button>
+                <button id="hostMultiplayerBtn" onclick="confirmRaceModeAndHost()" style="padding: 12px 25px; font-size: 16px; font-weight: bold; background: #2196F3; color: white; border: none; border-radius: 8px; cursor: pointer;">Host Multiplayer</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let selectedRaceMode = null;
+
+        function selectRaceMode(element) {
+            document.querySelectorAll('.race-mode-option').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+            selectedRaceMode = element.dataset.mode;
+            window.selectedRaceMode = selectedRaceMode;
+        }
+
+        function confirmRaceMode() {
+            if (!selectedRaceMode) {
+                alert('Please select a race mode!');
+                return;
+            }
+            window.raceMode = selectedRaceMode;
+            window.isMultiplayer = false;
+            console.log('Selected race mode (solo):', window.raceMode);
+
+            document.getElementById('raceModeModal').style.display = 'none';
+            document.getElementById('viewSelectModal').style.display = 'flex';
+        }
+
+        function confirmRaceModeAndHost() {
+            if (!selectedRaceMode) {
+                alert('Please select a race mode!');
+                return;
+            }
+            window.raceMode = selectedRaceMode;
+            window.isMultiplayer = true;
+            window.pendingMultiplayerHost = true; // Flag to show we're hosting after map select
+            console.log('Selected race mode (multiplayer host):', window.raceMode);
+
+            // Show map selection before hosting
+            document.getElementById('raceModeModal').style.display = 'none';
+            document.getElementById('mapSelectModal').style.display = 'flex';
+        }
+    </script>
+
+    <div id="joinGameModal" style="display: none;">
+        <div id="joinGameForm">
+            <h2>🔗 Join Local Game</h2>
+            <p>Enter the game code from the host</p>
+            <div class="code-input-container">
+                <input type="text" id="gameCodeInput" placeholder="XXXX" maxlength="4" autocomplete="off" style="
+                    width: 150px;
+                    padding: 15px;
+                    font-size: 32px;
+                    font-family: 'Courier New', monospace;
+                    text-align: center;
+                    text-transform: uppercase;
+                    background: #111;
+                    border: 2px solid #444;
+                    border-radius: 8px;
+                    color: white;
+                    letter-spacing: 8px;
+                ">
+            </div>
+            <p style="font-size: 12px; color: #666; margin-top: 15px;">Ask the host for their 4-letter code</p>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                <button onclick="document.getElementById('joinGameModal').style.display='none'; document.getElementById('mainMenuModal').style.display='flex';" style="
+                    padding: 12px 25px;
+                    font-size: 16px;
+                    background: #444;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                ">Back</button>
+                <button id="joinGameSubmit" onclick="joinMultiplayerGame()" style="
+                    padding: 12px 25px;
+                    font-size: 16px;
+                    font-weight: bold;
+                    background: #4CAF50;
+                    color: white;
+                    border: none;
+                    border-radius: 8px;
+                    cursor: pointer;
+                ">Join Game</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Game Lobby Panel -->
+    <div id="gameLobbyModal" style="display: none;">
+        <div class="lobby-content">
+            <h2 id="lobbyTitle">Game Lobby</h2>
+            <div class="lobby-code-section">
+                <p>Share this code:</p>
+                <div class="lobby-code" id="lobbyCode">----</div>
+            </div>
+            <div class="lobby-info">
+                <div id="lobbyRaceMode">1600m Mile</div>
+                <div id="lobbyPlayerCount">1/8</div>
+            </div>
+            <h3 style="color: #888; font-size: 12px; margin-bottom: 8px;">PLAYERS</h3>
+            <div class="lobby-players" id="lobbyPlayerList">
+                <!-- Players will be populated dynamically -->
+            </div>
+            <div id="lobbyConnecting" style="display: none; text-align: center; padding: 20px;">
+                <div class="connecting-spinner"></div>
+                <p style="color: #888; margin-top: 10px;">Connecting...</p>
+            </div>
+            <div class="lobby-buttons">
+                <button id="lobbyStartBtn" class="lobby-btn start" style="display: none;">Start Game</button>
+                <button id="lobbyBackBtn" class="lobby-btn back">Leave Lobby</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Multiplayer lobby management
+        let networkManager = null;
+        let isHosting = false;
+
+        async function initMultiplayer() {
+            const { getNetworkManager } = await import('./js/NetworkManager.js');
+            networkManager = getNetworkManager();
+            setupNetworkCallbacks();
+        }
+
+        function setupNetworkCallbacks() {
+            networkManager.on('onPlayerJoin', (player) => {
+                console.log('Player joined:', player.name);
+                updateLobbyPlayerList();
+            });
+
+            networkManager.on('onPlayerLeave', (player) => {
+                console.log('Player left:', player.name);
+                updateLobbyPlayerList();
+            });
+
+            networkManager.on('onPlayerListUpdate', (players) => {
+                console.log('Player list updated:', players);
+                updateLobbyPlayerList();
+            });
+
+            networkManager.on('onRaceStart', (data) => {
+                console.log('Race starting!', data);
+                // Close lobby and post-race modal
+                document.getElementById('gameLobbyModal').style.display = 'none';
+                document.getElementById('postRaceModal').style.display = 'none';
+
+                window.raceMode = data.raceMode;
+                window.raceDistance = data.raceDistance;
+                window.isMultiplayer = true; // Mark as multiplayer for joining players
+
+                // Reset game state for new race
+                if (window.resetGameState) {
+                    window.resetGameState();
+                }
+
+                // Apply the map selected by host
+                if (data.selectedMap && window.setView) {
+                    console.log('Setting map to:', data.selectedMap);
+                    window.setView(data.selectedMap);
+                }
+
+                // For clients (non-host), prepare for countdown - don't show view select
+                // The countdown will be shown when host broadcasts it
+                // We just need to be ready to receive countdown updates
+                console.log('Waiting for synchronized countdown from host...');
+            });
+
+            networkManager.on('onPlayerReady', (player) => {
+                console.log('Player ready:', player.name, player.characterModel);
+                updateLobbyPlayerList();
+            });
+
+            networkManager.on('onCountdown', (count) => {
+                console.log('Countdown received from host:', count);
+                // Display synchronized countdown for clients (non-host)
+                if (!networkManager.isHost) {
+                    displayCountdownNumber(count);
+                }
+            });
+
+            networkManager.on('onRaceRestart', () => {
+                console.log('Race restart received from host');
+                if (window.restartRace) {
+                    window.restartRace();
+                }
+            });
+
+            networkManager.on('onHostLeft', () => {
+                console.log('Host left - game ending');
+                alert('The host has left the game.');
+
+                // Clean up and return to main menu
+                networkManager.disconnect();
+                document.getElementById('gameLobbyModal').style.display = 'none';
+                document.getElementById('mainMenuModal').style.display = 'flex';
+
+                // Reset game state if race was in progress
+                if (window.resetGame) {
+                    window.resetGame();
+                }
+            });
+
+            // Display a single countdown number/bang for clients
+            function displayCountdownNumber(count) {
+                const overlay = document.getElementById('countdownOverlay');
+                const text = document.getElementById('countdownText');
+                const flash = document.getElementById('countdownFlash');
+
+                overlay.style.display = 'flex';
+
+                if (count > 0) {
+                    // Show number
+                    text.className = '';
+                    text.textContent = count;
+                    text.style.animation = 'none';
+                    void text.offsetWidth;
+                    text.style.animation = 'countdownPulse 0.5s ease-out';
+                    playCountdownBeep();
+                } else {
+                    // Show BANG and start race
+                    text.textContent = '*BANG*';
+                    text.className = 'bang';
+                    text.style.animation = 'none';
+                    void text.offsetWidth;
+                    text.style.animation = 'bangFlash 0.3s ease-out';
+
+                    flash.className = 'flash';
+                    setTimeout(() => flash.className = '', 150);
+
+                    playGunshot();
+
+                    // Start race after BANG
+                    setTimeout(() => {
+                        overlay.style.display = 'none';
+                        window.startRaceAfterCountdown();
+                    }, 500);
+                }
+            }
+        }
+
+        function updateLobbyPlayerList() {
+            const playerList = document.getElementById('lobbyPlayerList');
+            const players = networkManager.getAllPlayers();
+
+            console.log('=== updateLobbyPlayerList ===');
+            console.log('Total players:', players.length);
+            players.forEach((p, i) => {
+                console.log(`  Player ${i}: peerId=${p.peerId}, name=${p.name}, characterModel=${p.characterModel}`);
+            });
+
+            playerList.innerHTML = '';
+
+            players.forEach((player, index) => {
+                const isHost = player.peerId.includes('-host');
+                const isLocal = player.peerId === networkManager.localPlayer?.peerId;
+                const isReady = player.ready || isHost; // Host is always ready
+
+                // Get character emoji
+                const charEmojis = {
+                    trump: '🧔',
+                    musk: '🚀',
+                    stalin: '☭',
+                    skeleton: '💀',
+                    snowman: '⛄',
+                    demon: '👹',
+                    default: '🏃'
+                };
+                const charEmoji = player.characterModel ? (charEmojis[player.characterModel] || '🏃') : '❓';
+
+                const div = document.createElement('div');
+                div.className = 'lobby-player' + (isHost ? ' host' : '');
+
+                // Determine status text (Host takes priority, then Ready/Selecting)
+                let statusText = isReady ? 'Ready' : 'Selecting...';
+                let statusClass = isReady ? 'ready' : 'waiting';
+                if (isHost) {
+                    statusText = 'Host';
+                    statusClass = 'host-status';
+                }
+
+                div.innerHTML = `
+                    <span class="lobby-player-icon">${charEmoji}</span>
+                    <span class="lobby-player-name">${player.name || 'Player'}${isLocal ? ' (You)' : ''}</span>
+                    <span class="player-status ${statusClass}">${statusText}</span>
+                `;
+                playerList.appendChild(div);
+            });
+
+            document.getElementById('lobbyPlayerCount').textContent = `Players: ${players.length}/8`;
+
+            // Check if host can start (all players ready)
+            if (isHosting && networkManager.allPlayersReady()) {
+                document.getElementById('lobbyStartBtn').classList.add('can-start');
+            } else {
+                document.getElementById('lobbyStartBtn').classList.remove('can-start');
+            }
+        }
+
+        async function hostMultiplayerGame() {
+            await initMultiplayer();
+
+            // Use the player's entered name, not the character model name
+            const playerName = window.playerName || 'Player';
+            const characterModel = window.playerCharacter || 'trump';
+
+            try {
+                // Show lobby panel on right side (not fullscreen for host)
+                const lobbyModal = document.getElementById('gameLobbyModal');
+                lobbyModal.classList.remove('fullscreen');
+                lobbyModal.style.display = 'flex';
+                document.getElementById('lobbyConnecting').style.display = 'block';
+
+                const roomCode = await networkManager.hostGame(playerName, characterModel);
+
+                // Mark host as ready with their character
+                if (networkManager.localPlayer) {
+                    networkManager.localPlayer.ready = true;
+                    networkManager.localPlayer.characterModel = characterModel;
+                }
+
+                document.getElementById('lobbyConnecting').style.display = 'none';
+                document.getElementById('lobbyCode').textContent = roomCode;
+                document.getElementById('lobbyTitle').textContent = 'Waiting for Players';
+                document.getElementById('lobbyRaceMode').textContent = `${getRaceModeName(window.selectedRaceMode)}`;
+                document.getElementById('lobbyStartBtn').style.display = 'block';
+
+                isHosting = true;
+                updateLobbyPlayerList();
+
+                // Hide race mode modal
+                document.getElementById('raceModeModal').style.display = 'none';
+            } catch (error) {
+                console.error('Failed to host game:', error);
+                document.getElementById('lobbyConnecting').style.display = 'none';
+                document.getElementById('gameLobbyModal').style.display = 'none';
+                alert('Failed to create game: ' + error.message);
+            }
+        }
+
+        function getRaceModeName(mode) {
+            const names = {
+                'relay_4x100': '4x100m Relay',
+                'sprint_400': '400m Sprint',
+                'mile_1600': '1600m Mile'
+            };
+            return names[mode] || '1600m Mile';
+        }
+
+        async function joinMultiplayerGame() {
+            const codeInput = document.getElementById('gameCodeInput');
+            const roomCode = codeInput.value.toUpperCase().trim();
+
+            if (roomCode.length !== 4) {
+                alert('Please enter a 4-character game code');
+                return;
+            }
+
+            await initMultiplayer();
+
+            // Store room code
+            window.pendingRoomCode = roomCode;
+
+            // Set up callback for receiving available characters
+            networkManager.on('onAvailableCharacters', (availableChars) => {
+                console.log('Available characters:', availableChars);
+                // Hide join modal and show character select with available characters
+                document.getElementById('joinGameModal').style.display = 'none';
+                showCharacterSelectForJoin(availableChars);
+            });
+
+            try {
+                // Connect to room first (without character - just to get available chars)
+                document.getElementById('joinGameModal').querySelector('button').disabled = true;
+                const joinBtn = document.getElementById('joinGameSubmit');
+                joinBtn.textContent = 'Connecting...';
+
+                await networkManager.joinGame(roomCode, 'Player', null);
+
+                joinBtn.textContent = 'Join Game';
+                document.getElementById('joinGameModal').querySelector('button').disabled = false;
+
+                // Request available characters from host
+                networkManager.requestAvailableCharacters();
+
+            } catch (error) {
+                console.error('Failed to join game:', error);
+                const joinBtn = document.getElementById('joinGameSubmit');
+                joinBtn.textContent = 'Join Game';
+                alert('Failed to join game: ' + error.message);
+            }
+        }
+
+        async function connectToRoom(roomCode) {
+            // This is called after character selection for joining players
+            // Connection is already established, just update lobby UI
+
+            // Show lobby in fullscreen mode for joining players
+            const lobbyModal = document.getElementById('gameLobbyModal');
+            lobbyModal.classList.add('fullscreen');
+            lobbyModal.style.display = 'flex';
+
+            document.getElementById('lobbyCode').textContent = roomCode;
+            document.getElementById('lobbyTitle').textContent = 'Waiting for Host';
+            document.getElementById('lobbyStartBtn').style.display = 'none'; // Only host can start
+            document.getElementById('lobbyRaceMode').textContent = 'Waiting for race to start...';
+
+            isHosting = false;
+            updateLobbyPlayerList();
+        }
+
+        function startMultiplayerRace() {
+            if (!isHosting || !networkManager) return;
+
+            // Check if all players are ready
+            if (!networkManager.allPlayersReady()) {
+                alert('Not all players are ready!');
+                return;
+            }
+
+            const raceMode = window.selectedRaceMode || 'mile_1600';
+            const raceDistance = window.raceDistance || 1600;
+            const selectedMap = window.selectedView || 'default';
+
+            // Broadcast race start to all clients (they will prepare for countdown)
+            networkManager.startRace(raceMode, raceDistance, selectedMap);
+
+            // Also set the view for the host
+            if (window.setView) {
+                window.setView(selectedMap);
+            }
+
+            // Close lobby for host
+            document.getElementById('gameLobbyModal').style.display = 'none';
+
+            // Host runs synchronized countdown and broadcasts to all
+            runSynchronizedCountdown(() => {
+                // After countdown, start the actual race
+                window.startRaceAfterCountdown();
+            });
+        }
+
+        // Run countdown and broadcast to all players
+        function runSynchronizedCountdown(onComplete) {
+            const overlay = document.getElementById('countdownOverlay');
+            const text = document.getElementById('countdownText');
+            const flash = document.getElementById('countdownFlash');
+
+            overlay.style.display = 'flex';
+            let count = 3;
+
+            function showNumber() {
+                text.className = '';
+                text.textContent = count;
+                text.style.animation = 'none';
+                void text.offsetWidth;
+                text.style.animation = 'countdownPulse 0.5s ease-out';
+
+                playCountdownBeep();
+
+                // Broadcast countdown to all clients (host only)
+                if (networkManager && networkManager.isHost) {
+                    networkManager.sendCountdown(count);
+                }
+
+                count--;
+                if (count > 0) {
+                    setTimeout(showNumber, 1000);
+                } else if (count === 0) {
+                    setTimeout(showBang, 1000);
+                }
+            }
+
+            function showBang() {
+                text.textContent = '*BANG*';
+                text.className = 'bang';
+                text.style.animation = 'none';
+                void text.offsetWidth;
+                text.style.animation = 'bangFlash 0.3s ease-out';
+
+                flash.className = 'flash';
+                setTimeout(() => flash.className = '', 150);
+
+                playGunshot();
+
+                // Broadcast BANG (count = 0)
+                if (networkManager && networkManager.isHost) {
+                    networkManager.sendCountdown(0);
+                }
+
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    if (onComplete) onComplete();
+                }, 500);
+            }
+
+            showNumber();
+        }
+
+        function leaveLobby() {
+            if (networkManager) {
+                networkManager.disconnect();
+            }
+            document.getElementById('gameLobbyModal').style.display = 'none';
+            document.getElementById('mainMenuModal').style.display = 'flex';
+            isHosting = false;
+        }
+
+        // Post-race functions
+        function showPostRaceModal(finishTime) {
+            const modal = document.getElementById('postRaceModal');
+            const timeDisplay = document.getElementById('postRaceTime');
+
+            // Format time
+            const mins = Math.floor(finishTime / 60);
+            const secs = (finishTime % 60).toFixed(2);
+            timeDisplay.textContent = `Time: ${mins}:${secs.padStart(5, '0')}`;
+
+            // Show appropriate controls based on multiplayer/host status
+            const hostControls = document.getElementById('hostNextRaceControls');
+            const clientControls = document.getElementById('clientWaitingControls');
+            const soloControls = document.getElementById('soloNextRaceControls');
+
+            hostControls.style.display = 'none';
+            clientControls.style.display = 'none';
+            soloControls.style.display = 'none';
+
+            if (window.isMultiplayer && networkManager) {
+                if (networkManager.isHost) {
+                    hostControls.style.display = 'block';
+                    // Set current selections as defaults
+                    document.getElementById('nextRaceMode').value = window.raceMode || 'mile_1600';
+                    document.getElementById('nextRaceMap').value = window.selectedView || 'default';
+                } else {
+                    clientControls.style.display = 'block';
+                }
+            } else {
+                soloControls.style.display = 'block';
+            }
+
+            modal.style.display = 'flex';
+        }
+
+        function leavePostRace() {
+            document.getElementById('postRaceModal').style.display = 'none';
+
+            if (networkManager) {
+                networkManager.disconnect();
+            }
+
+            // Reset to main menu
+            document.getElementById('mainMenuModal').style.display = 'flex';
+            window.isMultiplayer = false;
+            isHosting = false;
+
+            // Reset game state
+            if (window.resetGameState) {
+                window.resetGameState();
+            }
+        }
+
+        function raceAgainSolo() {
+            document.getElementById('postRaceModal').style.display = 'none';
+
+            // Just click the start button logic
+            if (window.runCountdown) {
+                window.runCountdown(() => {
+                    window.startRaceAfterCountdown();
+                });
+            }
+        }
+
+        function startNextRace() {
+            const raceMode = document.getElementById('nextRaceMode').value;
+            const selectedMap = document.getElementById('nextRaceMap').value;
+
+            // Update global state
+            window.raceMode = raceMode;
+            window.selectedRaceMode = raceMode;
+            window.selectedView = selectedMap;
+
+            // Hide post-race modal
+            document.getElementById('postRaceModal').style.display = 'none';
+
+            // Reset game state for host
+            if (window.resetGameState) {
+                window.resetGameState();
+            }
+
+            // Set the map
+            if (window.setView) {
+                window.setView(selectedMap);
+            }
+
+            // Broadcast to all clients
+            if (networkManager && networkManager.isHost) {
+                networkManager.startRace(raceMode, 0, selectedMap);
+            }
+
+            // Run synchronized countdown
+            runSynchronizedCountdown(() => {
+                window.startRaceAfterCountdown();
+            });
+        }
+
+        // Export showPostRaceModal to window so main.js can call it
+        window.showPostRaceModal = showPostRaceModal;
+
+        // Set up lobby button handlers
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('lobbyBackBtn')?.addEventListener('click', leaveLobby);
+            document.getElementById('lobbyStartBtn')?.addEventListener('click', startMultiplayerRace);
+        });
+
+        // Countdown and gunshot sound
+        let countdownAudioContext = null;
+
+        function initCountdownAudio() {
+            if (!countdownAudioContext) {
+                countdownAudioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            return countdownAudioContext;
+        }
+
+        function playCountdownBeep() {
+            const ctx = initCountdownAudio();
+            if (ctx.state === 'suspended') ctx.resume();
+
+            const now = ctx.currentTime;
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(880, now);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.15);
+        }
+
+        function playGunshot() {
+            const ctx = initCountdownAudio();
+            if (ctx.state === 'suspended') ctx.resume();
+
+            const now = ctx.currentTime;
+
+            // Create noise buffer for gunshot
+            const bufferSize = ctx.sampleRate * 0.3;
+            const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+
+            // Fill with noise
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / bufferSize, 3);
+            }
+
+            const noise = ctx.createBufferSource();
+            noise.buffer = buffer;
+
+            // Low-pass filter for boom
+            const lowpass = ctx.createBiquadFilter();
+            lowpass.type = 'lowpass';
+            lowpass.frequency.setValueAtTime(1000, now);
+            lowpass.frequency.exponentialRampToValueAtTime(100, now + 0.2);
+
+            // High-pass for crack
+            const highpass = ctx.createBiquadFilter();
+            highpass.type = 'highpass';
+            highpass.frequency.value = 1000;
+
+            const noiseGain = ctx.createGain();
+            noiseGain.gain.setValueAtTime(1.5, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+
+            // Boom oscillator
+            const boom = ctx.createOscillator();
+            boom.type = 'sine';
+            boom.frequency.setValueAtTime(150, now);
+            boom.frequency.exponentialRampToValueAtTime(30, now + 0.15);
+
+            const boomGain = ctx.createGain();
+            boomGain.gain.setValueAtTime(1, now);
+            boomGain.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+
+            // Connect noise path
+            noise.connect(lowpass);
+            lowpass.connect(noiseGain);
+            noiseGain.connect(ctx.destination);
+
+            // Connect boom path
+            boom.connect(boomGain);
+            boomGain.connect(ctx.destination);
+
+            // Crack layer
+            const crack = ctx.createBufferSource();
+            const crackBuffer = ctx.createBuffer(1, ctx.sampleRate * 0.05, ctx.sampleRate);
+            const crackData = crackBuffer.getChannelData(0);
+            for (let i = 0; i < crackBuffer.length; i++) {
+                crackData[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / crackBuffer.length, 0.5);
+            }
+            crack.buffer = crackBuffer;
+
+            const crackGain = ctx.createGain();
+            crackGain.gain.setValueAtTime(0.8, now);
+            crackGain.gain.exponentialRampToValueAtTime(0.01, now + 0.05);
+
+            crack.connect(highpass);
+            highpass.connect(crackGain);
+            crackGain.connect(ctx.destination);
+
+            noise.start(now);
+            boom.start(now);
+            crack.start(now);
+            boom.stop(now + 0.2);
+        }
+
+        function runCountdown(onComplete) {
+            const overlay = document.getElementById('countdownOverlay');
+            const text = document.getElementById('countdownText');
+            const flash = document.getElementById('countdownFlash');
+
+            overlay.style.display = 'flex';
+            let count = 3;
+
+            function showNumber() {
+                text.className = '';
+                text.textContent = count;
+                // Force reflow for animation
+                void text.offsetWidth;
+                text.style.animation = 'none';
+                void text.offsetWidth;
+                text.style.animation = 'countdownPulse 0.5s ease-out';
+
+                playCountdownBeep();
+
+                count--;
+                if (count > 0) {
+                    setTimeout(showNumber, 1000);
+                } else if (count === 0) {
+                    setTimeout(showBang, 1000);
+                }
+            }
+
+            function showBang() {
+                text.textContent = '*BANG*';
+                text.className = 'bang';
+                text.style.animation = 'none';
+                void text.offsetWidth;
+                text.style.animation = 'bangFlash 0.3s ease-out';
+
+                // Screen flash
+                flash.className = 'flash';
+                setTimeout(() => flash.className = '', 150);
+
+                playGunshot();
+
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                    if (onComplete) onComplete();
+                }, 500);
+            }
+
+            showNumber();
+        }
+
+        // Export for use in main.js
+        window.runCountdown = runCountdown;
+    </script>
+
+    <div id="goalTimeModal" style="display: none;">
         <div id="goalTimeForm">
-            <h2>🏃 5K Treadmill Race</h2>
-            <p>Select your goal time</p>
+            <h2>🏃 Goal Time</h2>
+            <p>Select your target time</p>
             <div id="timePickerContainer">
                 <div style="text-align: center;">
                     <div class="scroll-picker" id="minutesPicker">
-                        <div class="scroll-picker-inner" id="minutesInner"></div>
+                        <div class="scroll-picker-inner" id="minutesInner">
+                            <!-- Fallback numbers if JS doesn't populate -->
+                            <div class="scroll-option" data-value="15">15</div>
+                            <div class="scroll-option" data-value="16">16</div>
+                            <div class="scroll-option" data-value="17">17</div>
+                            <div class="scroll-option" data-value="18">18</div>
+                            <div class="scroll-option" data-value="19">19</div>
+                            <div class="scroll-option" data-value="20">20</div>
+                            <div class="scroll-option selected" data-value="21">21</div>
+                            <div class="scroll-option" data-value="22">22</div>
+                            <div class="scroll-option" data-value="23">23</div>
+                            <div class="scroll-option" data-value="24">24</div>
+                            <div class="scroll-option" data-value="25">25</div>
+                            <div class="scroll-option" data-value="26">26</div>
+                            <div class="scroll-option" data-value="27">27</div>
+                            <div class="scroll-option" data-value="28">28</div>
+                            <div class="scroll-option" data-value="29">29</div>
+                            <div class="scroll-option" data-value="30">30</div>
+                        </div>
                     </div>
-                    <div class="picker-label">min</div>
+                    <div class="picker-label">MIN</div>
                 </div>
                 <span class="time-separator">:</span>
                 <div style="text-align: center;">
                     <div class="scroll-picker" id="secondsPicker">
-                        <div class="scroll-picker-inner" id="secondsInner"></div>
+                        <div class="scroll-picker-inner" id="secondsInner">
+                            <!-- Fallback numbers if JS doesn't populate -->
+                            <div class="scroll-option selected" data-value="0">00</div>
+                            <div class="scroll-option" data-value="15">15</div>
+                            <div class="scroll-option" data-value="30">30</div>
+                            <div class="scroll-option" data-value="45">45</div>
+                        </div>
                     </div>
-                    <div class="picker-label">sec</div>
+                    <div class="picker-label">SEC</div>
                 </div>
             </div>
-            <button id="goalTimeSubmit">SET GOAL</button>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
+                <button onclick="document.getElementById('goalTimeModal').style.display='none'; document.getElementById('characterSelectModal').style.display='flex';" style="padding: 12px 25px; font-size: 16px; background: #444; color: white; border: none; border-radius: 8px; cursor: pointer;">Back</button>
+                <button id="goalTimeSubmit" onclick="console.log('Button clicked'); document.getElementById('goalTimeModal').style.display='none'; document.getElementById('viewSelectModal').style.display='flex';">SET GOAL</button>
+            </div>
         </div>
     </div>
     <div id="viewSelectModal" style="display: none;">
@@ -574,32 +2468,101 @@
             <h2>Choose Your View</h2>
             <p>Where do you want to run?</p>
             <div class="view-select-options">
-                <div class="view-select-option selected" data-view="default">
+                <div class="view-select-option selected" data-view="default" onclick="selectView(this)">
                     <div class="view-option-icon">🏟️</div>
                     <div class="view-option-name">Track</div>
                     <div class="view-option-desc">Classic oval track</div>
                 </div>
-                <div class="view-select-option" data-view="mountain">
+                <div class="view-select-option" data-view="mountain" onclick="selectView(this)">
                     <div class="view-option-icon">🏔️</div>
                     <div class="view-option-name">Mountain</div>
                     <div class="view-option-desc">Scenic mountain view</div>
                 </div>
-                <div class="view-select-option" data-view="city">
+                <div class="view-select-option" data-view="city" onclick="selectView(this)">
                     <div class="view-option-icon">🏙️</div>
                     <div class="view-option-name">City</div>
                     <div class="view-option-desc">NYC streets</div>
                 </div>
-                <div class="view-select-option" data-view="mountain_roads">
+                <div class="view-select-option" data-view="mountain_roads" onclick="selectView(this)">
                     <div class="view-option-icon">🛣️</div>
                     <div class="view-option-name">Mtn Roads</div>
                     <div class="view-option-desc">Winding mountain roads</div>
                 </div>
             </div>
-            <button id="viewSelectSubmit">START</button>
+            <script>
+                window.selectedView = 'default';
+                function selectView(element) {
+                    document.querySelectorAll('.view-select-option').forEach(opt => opt.classList.remove('selected'));
+                    element.classList.add('selected');
+                    window.selectedView = element.dataset.view;
+                }
+
+                function confirmViewSelection() {
+                    document.getElementById('viewSelectModal').style.display = 'none';
+                    document.getElementById('startButton').style.display = 'block';
+
+                    // Only show pace slider for modes that don't use arrow keys or spacebar mash
+                    // (relay, 400m, 1600m all use different input systems)
+                    const raceMode = window.raceMode;
+                    const usesPaceSlider = !raceMode || raceMode === 'default';
+                    document.getElementById('paceSliderContainer').style.display = usesPaceSlider ? 'flex' : 'none';
+                }
+            </script>
+            <div style="display: flex; gap: 10px; justify-content: center;">
+                <button onclick="document.getElementById('viewSelectModal').style.display='none'; document.getElementById('characterSelectModal').style.display='flex';" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #444; color: white; border: none; border-radius: 8px; cursor: pointer;">Back</button>
+                <button id="viewSelectSubmit" onclick="confirmViewSelection();">START</button>
+            </div>
         </div>
     </div>
-    <div id="treadmillMessage">
-        Get your treadmill to desired speed,<br>then press <strong>'Play'</strong>!
+    <!-- Map Select Modal for Multiplayer -->
+    <div id="mapSelectModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #000000; justify-content: center; align-items: center; z-index: 300;">
+        <div id="mapSelectForm" style="background: #222; padding: 40px; border-radius: 16px; text-align: center; color: white; font-family: 'Arial', sans-serif;">
+            <h2 style="margin: 0 0 10px 0; font-size: 28px;">Choose Map</h2>
+            <p style="margin: 10px 0; color: #aaa; font-size: 14px;">Where do you want to race?</p>
+            <div class="view-select-options">
+                <div class="view-select-option selected" data-view="default" onclick="selectMap(this)">
+                    <div class="view-option-icon">🏟️</div>
+                    <div class="view-option-name">Track</div>
+                    <div class="view-option-desc">Classic oval track</div>
+                </div>
+                <div class="view-select-option" data-view="mountain" onclick="selectMap(this)">
+                    <div class="view-option-icon">🏔️</div>
+                    <div class="view-option-name">Mountain</div>
+                    <div class="view-option-desc">Scenic mountain view</div>
+                </div>
+                <div class="view-select-option" data-view="city" onclick="selectMap(this)">
+                    <div class="view-option-icon">🏙️</div>
+                    <div class="view-option-name">City</div>
+                    <div class="view-option-desc">NYC streets</div>
+                </div>
+                <div class="view-select-option" data-view="mountain_roads" onclick="selectMap(this)">
+                    <div class="view-option-icon">🛣️</div>
+                    <div class="view-option-name">Mtn Roads</div>
+                    <div class="view-option-desc">Winding mountain roads</div>
+                </div>
+            </div>
+            <script>
+                window.selectedMap = 'default';
+                function selectMap(element) {
+                    document.querySelectorAll('#mapSelectModal .view-select-option').forEach(opt => opt.classList.remove('selected'));
+                    element.classList.add('selected');
+                    window.selectedMap = element.dataset.view;
+                }
+                function confirmMapAndHost() {
+                    window.selectedView = window.selectedMap;
+                    document.getElementById('mapSelectModal').style.display = 'none';
+                    hostMultiplayerGame();
+                }
+            </script>
+            <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                <button onclick="document.getElementById('mapSelectModal').style.display='none'; document.getElementById('raceModeModal').style.display='flex'; window.pendingMultiplayerHost = false;" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #444; color: white; border: none; border-radius: 8px; cursor: pointer;">Back</button>
+                <button onclick="confirmMapAndHost()" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #2196F3; color: white; border: none; border-radius: 8px; cursor: pointer;">Host Game</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="treadmillMessage" style="display: none;">
+        <!-- Removed treadmill message -->
     </div>
     <button id="settingsButton">
         <svg viewBox="0 0 24 24"><path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/></svg>
@@ -632,13 +2595,19 @@
                 <label>Path Editor</label>
                 <button id="startPathEditor" style="width:100%; padding:12px; background:#4488ff; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">Edit Map Path</button>
             </div>
+            <div id="restartRaceSection" class="settings-section" style="display:none;">
+                <label>Host Controls</label>
+                <button id="restartRaceButton" style="width:100%; padding:12px; background:#ff8800; color:white; border:none; border-radius:8px; cursor:pointer; font-weight:bold;">RESTART RACE</button>
+            </div>
             <button id="settingsClose">DONE</button>
+            <button id="quitGame" style="width:100%; margin-top:10px; padding:12px; background:#cc3333; color:white; border:none; border-radius:8px; cursor:pointer; font-size:16px; font-weight:bold;">QUIT TO MENU</button>
         </div>
     </div>
     <div id="info">
-        <strong>5K Treadmill Race</strong><br><br>
+        <strong>Track Runner</strong><br><br>
         Use slider to set pace<br>
-        Drag to look around
+        Drag to look around<br>
+        Press V to toggle view
     </div>
     <div id="loading">Loading runners...</div>
     <button id="startButton" style="display: none;">PLAY</button>
@@ -648,6 +2617,96 @@
         <input type="range" id="paceSlider" min="3" max="12" step="0.1" value="8">
         <div id="paceDisplay">8:00</div>
         <div id="paceUnit">min/mile</div>
+    </div>
+
+    <!-- Race Mode UI Elements -->
+    <div id="energyBarContainer">
+        <div id="energyLabel">LACTIC ACID</div>
+        <div id="energyBar">
+            <div id="energyFill"></div>
+        </div>
+    </div>
+    <div id="mphDisplay">0.0 MPH</div>
+    <div id="legCounter">LEG 1/4</div>
+    <div id="lapCounter">LAP 1/4</div>
+    <div id="exchangeZoneIndicator">
+        EXCHANGE ZONE!<br>
+        <span style="font-size: 18px;">Press ↵ to handoff</span>
+    </div>
+    <div id="dnfOverlay">
+        <h1>DNF</h1>
+        <p>Lactic acid overload - you pushed too hard!</p>
+    </div>
+
+    <!-- Winner Celebration -->
+    <canvas id="confettiCanvas"></canvas>
+    <div id="winnerOverlay">
+        <div id="winnerText">WINNER!</div>
+    </div>
+
+    <!-- Post-Race Modal (Multiplayer) -->
+    <div id="postRaceModal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); justify-content: center; align-items: center; z-index: 350;">
+        <div style="background: #222; padding: 40px; border-radius: 16px; text-align: center; color: white; font-family: 'Arial', sans-serif; max-width: 500px;">
+            <h2 id="postRaceTitle" style="margin: 0 0 10px 0; font-size: 28px;">Race Complete!</h2>
+            <p id="postRaceTime" style="margin: 10px 0; color: #4CAF50; font-size: 24px;"></p>
+
+            <!-- Host Controls -->
+            <div id="hostNextRaceControls" style="display: none;">
+                <h3 style="margin: 20px 0 10px 0; color: #aaa;">Next Race</h3>
+
+                <!-- Race Mode Selection -->
+                <div style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 8px; color: #888;">Race Mode</label>
+                    <select id="nextRaceMode" style="width: 100%; padding: 12px; font-size: 16px; background: #333; color: white; border: 1px solid #555; border-radius: 8px;">
+                        <option value="relay_4x100">4x100m Relay</option>
+                        <option value="sprint_400">400m Sprint</option>
+                        <option value="mile_1600" selected>1600m Mile</option>
+                    </select>
+                </div>
+
+                <!-- Map Selection -->
+                <div style="margin: 15px 0;">
+                    <label style="display: block; margin-bottom: 8px; color: #888;">Map</label>
+                    <select id="nextRaceMap" style="width: 100%; padding: 12px; font-size: 16px; background: #333; color: white; border: 1px solid #555; border-radius: 8px;">
+                        <option value="default">🏟️ Track</option>
+                        <option value="mountain">🏔️ Mountain</option>
+                        <option value="city">🏙️ City</option>
+                        <option value="mountain_roads">🛣️ Mountain Roads</option>
+                    </select>
+                </div>
+
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                    <button onclick="leavePostRace()" style="padding: 15px 25px; font-size: 16px; background: #666; color: white; border: none; border-radius: 8px; cursor: pointer;">Leave Game</button>
+                    <button onclick="startNextRace()" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer;">Start Next Race</button>
+                </div>
+            </div>
+
+            <!-- Non-Host Waiting -->
+            <div id="clientWaitingControls" style="display: none;">
+                <p style="margin: 20px 0; color: #888; font-size: 16px;">Waiting for host to start next race...</p>
+                <div class="loader" style="margin: 20px auto; width: 40px; height: 40px; border: 4px solid #333; border-top-color: #4CAF50; border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                <button onclick="leavePostRace()" style="margin-top: 20px; padding: 12px 25px; font-size: 16px; background: #666; color: white; border: none; border-radius: 8px; cursor: pointer;">Leave Game</button>
+            </div>
+
+            <!-- Solo Race Button -->
+            <div id="soloNextRaceControls" style="display: none;">
+                <div style="display: flex; gap: 10px; justify-content: center; margin-top: 20px;">
+                    <button onclick="leavePostRace()" style="padding: 15px 25px; font-size: 16px; background: #666; color: white; border: none; border-radius: 8px; cursor: pointer;">Quit to Menu</button>
+                    <button onclick="raceAgainSolo()" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #4CAF50; color: white; border: none; border-radius: 8px; cursor: pointer;">Race Again</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <style>
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+
+    <!-- Race Countdown -->
+    <div id="countdownFlash"></div>
+    <div id="countdownOverlay">
+        <div id="countdownText">3</div>
     </div>
 
     <div id="pathEditorOverlay">
@@ -679,6 +2738,37 @@
         <pre id="pathCode"></pre>
         <button id="closePathOutput">Close</button>
     </div>
+
+    <!-- Focus warning handler -->
+    <script>
+        // Show warning when tab loses focus during a race
+        let raceActiveForFocus = false;
+
+        window.setRaceActiveForFocus = function(active) {
+            raceActiveForFocus = active;
+            if (active && !document.hasFocus()) {
+                document.getElementById('focusWarning').style.display = 'block';
+            }
+        };
+
+        window.addEventListener('blur', () => {
+            if (raceActiveForFocus) {
+                document.getElementById('focusWarning').style.display = 'block';
+            }
+        });
+
+        window.addEventListener('focus', () => {
+            document.getElementById('focusWarning').style.display = 'none';
+        });
+
+        // Also hide when clicked
+        document.getElementById('focusWarning')?.addEventListener('click', () => {
+            document.getElementById('focusWarning').style.display = 'none';
+        });
+    </script>
+
+    <!-- PeerJS for multiplayer -->
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
 
     <script type="importmap">
     {
