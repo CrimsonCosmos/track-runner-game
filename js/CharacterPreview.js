@@ -114,10 +114,14 @@ class CharacterPreviewManager {
         const modelInfo = CHARACTER_MODELS[charId];
         if (!modelInfo || !modelInfo.path) return;
 
+        console.log(`[Preview] Loading ${charId} from ${modelInfo.path}`);
+
         const loader = new FBXLoader();
         loader.load(
             modelInfo.path,
             (fbx) => {
+                console.log(`[Preview] ${charId} loaded successfully`);
+
                 // Scale the model (use character-specific scale or default)
                 // Preview default is 0.012, game default is 0.01, so multiply by 1.2
                 const baseScale = MODEL_SCALE_OVERRIDES[charId] || 0.01;
@@ -127,6 +131,9 @@ class CharacterPreviewManager {
                 // Center the model
                 const box = new THREE.Box3().setFromObject(fbx);
                 const center = box.getCenter(new THREE.Vector3());
+                const size = box.getSize(new THREE.Vector3());
+                console.log(`[Preview] ${charId} size: ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}`);
+
                 fbx.position.x = -center.x;
                 fbx.position.z = -center.z;
                 fbx.position.y = -box.min.y; // Ground the model (box is already in world space)
