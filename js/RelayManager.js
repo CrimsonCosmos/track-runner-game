@@ -15,6 +15,13 @@ const MODEL_ROTATION_OFFSETS = {
     skeleton: -Math.PI / 2,
 };
 
+// Scale overrides for models with different internal sizes
+const MODEL_SCALE_OVERRIDES = {
+    stalin: 0.018,
+    demon: 0.008,
+    // Default is 0.01
+};
+
 /**
  * RelayManager - Handles all relay-specific logic
  * - Tracks current leg (0-3)
@@ -384,7 +391,11 @@ export class RelayManager {
             modelPath,
             (fbx) => {
                 this.nextRunnerMesh = fbx;
-                this.nextRunnerMesh.scale.setScalar(0.01);
+
+                // Use character-specific scale or default
+                const characterKey = window.playerCharacter || '';
+                const scale = MODEL_SCALE_OVERRIDES[characterKey] || 0.01;
+                this.nextRunnerMesh.scale.setScalar(scale);
 
                 // Create animation mixer
                 this.nextRunnerMixer = new THREE.AnimationMixer(fbx);
