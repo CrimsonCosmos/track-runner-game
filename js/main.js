@@ -35,6 +35,7 @@ import { GhostManager } from './GhostRunner.js';
 import { createExchangeZoneUI, updateExchangeZoneUI } from './ExchangeZone.js';
 import { getCityPathLength, getCityStreetPosition } from './Track.js';
 import { getNetworkManager } from './NetworkManager.js';
+import './CharacterPreview.js'; // Character selection 3D previews
 
 // ============================================
 // SCENE SETUP
@@ -1124,6 +1125,13 @@ const MODEL_ROTATION_OFFSETS = {
     // Add other models here if they face the wrong direction
 };
 
+// Scale overrides for models with different internal sizes
+const MODEL_SCALE_OVERRIDES = {
+    stalin: 0.018,   // Stalin model is smaller, needs larger scale
+    demon: 0.008,    // Demon model is larger
+    // Default scale is 0.01
+};
+
 // Create mesh for remote players using their selected character model
 function createRemotePlayerMesh(remotePlayer) {
     // Check if using default character (colored capsule)
@@ -1161,8 +1169,10 @@ function createRemotePlayerMesh(remotePlayer) {
     loader.load(
         modelPath,
         (fbx) => {
-            // Scale the model
-            fbx.scale.setScalar(0.01);
+            // Scale the model (use character-specific scale or default)
+            const characterKey = remotePlayer.characterModel || '';
+            const scale = MODEL_SCALE_OVERRIDES[characterKey] || 0.01;
+            fbx.scale.setScalar(scale);
 
             // Setup animation
             const mixer = new THREE.AnimationMixer(fbx);
@@ -1433,14 +1443,18 @@ let playerGhostAction = null;
 
 function loadPlayerCharacterGhost(modelPath) {
     const loader = new FBXLoader();
-    console.log('Loading player character:', modelPath);
+    console.log('Loading player character:', modelPath, 'character:', window.playerCharacter);
 
     loader.load(
         modelPath,
         (fbx) => {
             playerGhost = fbx;
-            // Scale to reasonable human size
-            playerGhost.scale.setScalar(0.01);
+
+            // Use character-specific scale or default
+            const characterKey = window.playerCharacter || '';
+            const scale = MODEL_SCALE_OVERRIDES[characterKey] || 0.01;
+            playerGhost.scale.setScalar(scale);
+            console.log('Using scale:', scale, 'for character:', characterKey);
 
             // Debug: log the model's bounding box to see actual size
             const box = new THREE.Box3().setFromObject(playerGhost);

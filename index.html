@@ -1165,8 +1165,16 @@
             border-color: #888;
         }
         .character-preview {
-            font-size: 48px;
-            margin-bottom: 10px;
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 10px auto;
+            border-radius: 8px;
+            background: #222;
+        }
+        .character-preview canvas {
+            width: 100%;
+            height: 100%;
+            border-radius: 8px;
         }
         .character-name {
             font-size: 14px;
@@ -1437,7 +1445,7 @@
             }
             document.getElementById('mainMenuModal').style.display = 'none';
             if (selectedGameMode === 'create') {
-                document.getElementById('characterSelectModal').style.display = 'flex';
+                showCharacterSelectModal();
             } else if (selectedGameMode === 'join') {
                 document.getElementById('joinGameModal').style.display = 'flex';
             }
@@ -1450,31 +1458,31 @@
             <p id="characterSelectSubtitle">Select a character to play as</p>
             <div class="character-grid">
                 <div class="character-option" data-character="trump" onclick="selectCharacter(this)">
-                    <div class="character-preview">🧔</div>
+                    <div class="character-preview" id="preview-trump"></div>
                     <div class="character-name">Trump</div>
                 </div>
                 <div class="character-option" data-character="musk" onclick="selectCharacter(this)">
-                    <div class="character-preview">🚀</div>
+                    <div class="character-preview" id="preview-musk"></div>
                     <div class="character-name">Musk</div>
                 </div>
                 <div class="character-option" data-character="stalin" onclick="selectCharacter(this)">
-                    <div class="character-preview">☭</div>
+                    <div class="character-preview" id="preview-stalin"></div>
                     <div class="character-name">Stalin</div>
                 </div>
                 <div class="character-option" data-character="skeleton" onclick="selectCharacter(this)">
-                    <div class="character-preview">💀</div>
+                    <div class="character-preview" id="preview-skeleton"></div>
                     <div class="character-name">Skeleton</div>
                 </div>
                 <div class="character-option" data-character="snowman" onclick="selectCharacter(this)">
-                    <div class="character-preview">⛄</div>
+                    <div class="character-preview" id="preview-snowman"></div>
                     <div class="character-name">Snowman</div>
                 </div>
                 <div class="character-option" data-character="demon" onclick="selectCharacter(this)">
-                    <div class="character-preview">👹</div>
+                    <div class="character-preview" id="preview-demon"></div>
                     <div class="character-name">Demon</div>
                 </div>
                 <div class="character-option default-runner" data-character="default" onclick="selectCharacter(this)" style="display: none;">
-                    <div class="character-preview">🏃</div>
+                    <div class="character-preview" id="preview-default"></div>
                     <div class="character-name">Default Runner</div>
                 </div>
             </div>
@@ -1489,6 +1497,17 @@
         let selectedCharacter = null;
         let isSelectingForJoin = false;
         let availableCharacters = ['trump', 'musk', 'stalin', 'skeleton', 'snowman', 'demon'];
+        let characterPreviewsInitialized = false;
+
+        // Show character select modal and initialize 3D previews
+        function showCharacterSelectModal() {
+            document.getElementById('characterSelectModal').style.display = 'flex';
+            // Initialize 3D previews on first show (after main.js has loaded)
+            if (!characterPreviewsInitialized && window.initCharacterPreviews) {
+                window.initCharacterPreviews();
+                characterPreviewsInitialized = true;
+            }
+        }
 
         // Character model paths
         const CHARACTER_MODELS = {
@@ -1574,7 +1593,7 @@
                 document.getElementById('characterSelectSubtitle').textContent = 'Select an available character';
             }
 
-            document.getElementById('characterSelectModal').style.display = 'flex';
+            showCharacterSelectModal();
         }
 
         function confirmCharacter() {
@@ -1639,7 +1658,7 @@
                 </div>
             </div>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 25px;">
-                <button onclick="document.getElementById('raceModeModal').style.display='none'; document.getElementById('characterSelectModal').style.display='flex';" class="char-btn back-btn">Back</button>
+                <button onclick="document.getElementById('raceModeModal').style.display='none'; showCharacterSelectModal();" class="char-btn back-btn">Back</button>
                 <button id="raceModeSubmit" onclick="confirmRaceMode()" class="char-btn confirm-btn">Solo Race</button>
                 <button id="hostMultiplayerBtn" onclick="confirmRaceModeAndHost()" style="padding: 12px 25px; font-size: 16px; font-weight: bold; background: #2196F3; color: white; border: none; border-radius: 8px; cursor: pointer;">Host Multiplayer</button>
             </div>
@@ -2458,7 +2477,7 @@
                 </div>
             </div>
             <div style="display: flex; gap: 10px; justify-content: center; margin-top: 10px;">
-                <button onclick="document.getElementById('goalTimeModal').style.display='none'; document.getElementById('characterSelectModal').style.display='flex';" style="padding: 12px 25px; font-size: 16px; background: #444; color: white; border: none; border-radius: 8px; cursor: pointer;">Back</button>
+                <button onclick="document.getElementById('goalTimeModal').style.display='none'; showCharacterSelectModal();" style="padding: 12px 25px; font-size: 16px; background: #444; color: white; border: none; border-radius: 8px; cursor: pointer;">Back</button>
                 <button id="goalTimeSubmit" onclick="console.log('Button clicked'); document.getElementById('goalTimeModal').style.display='none'; document.getElementById('viewSelectModal').style.display='flex';">SET GOAL</button>
             </div>
         </div>
@@ -2509,7 +2528,7 @@
                 }
             </script>
             <div style="display: flex; gap: 10px; justify-content: center;">
-                <button onclick="document.getElementById('viewSelectModal').style.display='none'; document.getElementById('characterSelectModal').style.display='flex';" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #444; color: white; border: none; border-radius: 8px; cursor: pointer;">Back</button>
+                <button onclick="document.getElementById('viewSelectModal').style.display='none'; showCharacterSelectModal();" style="padding: 15px 30px; font-size: 18px; font-weight: bold; background: #444; color: white; border: none; border-radius: 8px; cursor: pointer;">Back</button>
                 <button id="viewSelectSubmit" onclick="confirmViewSelection();">START</button>
             </div>
         </div>
