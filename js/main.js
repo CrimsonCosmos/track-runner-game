@@ -1129,7 +1129,7 @@ const MODEL_ROTATION_OFFSETS = {
 
 // Scale overrides for models with different internal sizes
 const MODEL_SCALE_OVERRIDES = {
-    stalin: 0.018,   // Stalin model is smaller, needs larger scale
+    stalin: 1.0,     // ReadyPlayerMe model is already in meters
     demon: 0.008,    // Demon model is larger
     // Default scale is 0.01
 };
