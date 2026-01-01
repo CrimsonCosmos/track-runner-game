@@ -24,9 +24,8 @@ const MODEL_ROTATION_OFFSETS = {
 
 // Scale overrides for models with different internal sizes
 const MODEL_SCALE_OVERRIDES = {
-    stalin: 1.0,     // ReadyPlayerMe model is already in meters
     demon: 0.008,
-    // Default is 0.012 for previews
+    // Default is 0.01 (preview multiplies by 1.2)
 };
 
 class CharacterPreviewManager {
