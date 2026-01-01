@@ -2376,9 +2376,9 @@ function animateWithPathEditor() {
             playerGhost.rotation.y = ghostPos.rotation + playerGhostOffset;
 
             if (playerGhostMixer) {
-                // Speed up animation based on player speed
+                // Animation speed based on player speed - stops when not moving
                 const speedMultiplier = playerSpeed / 3; // Base animation speed ratio
-                playerGhostMixer.update(delta * Math.max(0.3, speedMultiplier));
+                playerGhostMixer.update(delta * speedMultiplier);
             }
         }
 
