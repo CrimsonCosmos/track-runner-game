@@ -423,7 +423,6 @@ export class RelayManager {
                 this.nextRunnerMesh.lookAt(aheadPos.x, aheadPos.y || 0, aheadPos.z);
 
                 // Apply model rotation offset if needed
-                const characterKey = window.playerCharacter || '';
                 const rotationOffset = MODEL_ROTATION_OFFSETS[characterKey] || 0;
                 if (rotationOffset !== 0) {
                     this.nextRunnerMesh.rotation.y += rotationOffset;
