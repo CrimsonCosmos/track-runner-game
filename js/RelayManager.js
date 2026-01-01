@@ -12,7 +12,10 @@ const NEXT_RUNNER_OFFSET = 10; // meters ahead in the exchange zone
 
 // Rotation offsets for models that don't face +Z by default
 const MODEL_ROTATION_OFFSETS = {
-    skeleton: -Math.PI / 2,
+    skeleton: Math.PI,       // Skeleton faces backwards, needs 180 degree rotation
+    trump: -Math.PI / 2,     // Trump faces +X, needs -90 degree rotation
+    musk: -Math.PI / 2,      // Musk faces +X, needs -90 degree rotation
+    snowman: -Math.PI / 2,   // Snowman faces +X, needs -90 degree rotation
 };
 
 // Scale overrides for models with different internal sizes
