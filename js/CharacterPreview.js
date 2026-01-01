@@ -50,8 +50,10 @@ class CharacterPreviewManager {
         this.renderer.setClearColor(0x000000, 0);
 
         // Initialize previews for each character
+        // Skip demon - 86MB file crashes browser
         Object.keys(CHARACTER_MODELS).forEach(charId => {
             if (charId === 'default') return; // Skip default for now
+            if (charId === 'demon') return;   // Skip demon - too large (86MB)
             this.createPreview(charId);
         });
 
