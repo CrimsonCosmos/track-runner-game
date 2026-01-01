@@ -406,11 +406,27 @@ export class RelayManager {
                     this.nextRunnerAction.timeScale = 0.3;
                 }
 
-                // Apply shadows
+                // Apply shadows and fix materials that might be invisible
                 fbx.traverse((child) => {
                     if (child.isMesh) {
                         child.castShadow = true;
                         child.receiveShadow = true;
+
+                        // Ensure materials are visible even without textures
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach(mat => {
+                            if (mat) {
+                                // If material has no map or map failed to load, ensure it's still visible
+                                if (!mat.map || mat.map.image === undefined) {
+                                    mat.color = mat.color || new THREE.Color(0x888888);
+                                }
+                                // Ensure material is not transparent
+                                mat.transparent = false;
+                                mat.opacity = 1;
+                                mat.side = THREE.DoubleSide;
+                                mat.needsUpdate = true;
+                            }
+                        });
                     }
                 });
 

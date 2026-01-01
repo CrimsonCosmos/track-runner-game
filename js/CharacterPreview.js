@@ -131,6 +131,26 @@ class CharacterPreviewManager {
                 const rotationOffset = MODEL_ROTATION_OFFSETS[charId] || 0;
                 fbx.rotation.y = rotationOffset;
 
+                // Fix materials that might be invisible due to missing textures
+                fbx.traverse((child) => {
+                    if (child.isMesh) {
+                        const materials = Array.isArray(child.material) ? child.material : [child.material];
+                        materials.forEach(mat => {
+                            if (mat) {
+                                // If material has no map or map failed to load, ensure it's still visible
+                                if (!mat.map || mat.map.image === undefined) {
+                                    mat.color = mat.color || new THREE.Color(0x888888);
+                                }
+                                // Ensure material is not transparent
+                                mat.transparent = false;
+                                mat.opacity = 1;
+                                mat.side = THREE.DoubleSide;
+                                mat.needsUpdate = true;
+                            }
+                        });
+                    }
+                });
+
                 // Setup animation
                 if (fbx.animations.length > 0) {
                     previewData.mixer = new THREE.AnimationMixer(fbx);
