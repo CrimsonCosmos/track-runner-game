@@ -1,258 +1,223 @@
-// CharacterPreview.js - Renders animated 3D character previews for selection screen
+// CharacterPreview.js - Renders 3D character previews sequentially to avoid memory issues
 
 import * as THREE from 'three';
 import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 
-// Character model paths (duplicated from index.html for module access)
+// Character model paths
 const CHARACTER_MODELS = {
     trump: { path: 'public/characters/trump/source/Running.fbx', name: 'Trump' },
     musk: { path: 'public/characters/musk.fbx', name: 'Musk' },
     stalin: { path: 'public/characters/stalin/source/model.fbx', name: 'Stalin' },
     skeleton: { path: 'public/characters/skeleton.fbx', name: 'Skeleton' },
     snowman: { path: 'public/characters/snowman.fbx', name: 'Snowman' },
-    demon: { path: 'public/characters/demon.fbx', name: 'Demon' },
-    default: { path: 'models/Running.fbx', name: 'Default Runner' }
 };
 
 // Rotation offsets for models that don't face camera by default
 const MODEL_ROTATION_OFFSETS = {
-    skeleton: Math.PI,       // Skeleton faces backwards, needs 180 degree rotation
-    trump: -Math.PI / 2,     // Trump faces +X, needs -90 degree rotation
-    musk: -Math.PI / 2,      // Musk faces +X, needs -90 degree rotation
-    snowman: -Math.PI / 2,   // Snowman faces +X, needs -90 degree rotation
+    skeleton: Math.PI,
+    trump: -Math.PI / 2,
+    musk: -Math.PI / 2,
+    snowman: -Math.PI / 2,
 };
 
-// Scale overrides for models with different internal sizes
+// Scale overrides
 const MODEL_SCALE_OVERRIDES = {
-    demon: 0.008,
-    // Default is 0.01 (preview multiplies by 1.2)
+    // Default is 0.01
 };
 
 class CharacterPreviewManager {
     constructor() {
-        this.previews = new Map();
         this.renderer = null;
-        this.clock = new THREE.Clock();
-        this.isAnimating = false;
+        this.scene = null;
+        this.camera = null;
         this.initialized = false;
+        this.currentModel = null;
+        this.mixer = null;
     }
 
     init() {
         if (this.initialized) return;
+        this.initialized = true;
 
-        // Create a shared renderer
-        this.renderer = new THREE.WebGLRenderer({
-            antialias: true,
-            alpha: true
-        });
-        // Use pixel ratio of 1 for consistent canvas sizing when copying to 2D canvas
+        // Create shared renderer, scene, camera
+        this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.renderer.setPixelRatio(1);
+        this.renderer.setSize(160, 160);
         this.renderer.setClearColor(0x000000, 0);
 
-        // Initialize previews for each character
-        // Skip demon - 86MB file crashes browser
-        Object.keys(CHARACTER_MODELS).forEach(charId => {
-            if (charId === 'default') return; // Skip default for now
-            if (charId === 'demon') return;   // Skip demon - too large (86MB)
-            this.createPreview(charId);
-        });
+        this.scene = new THREE.Scene();
 
-        this.initialized = true;
-        this.startAnimation();
+        this.camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
+        this.camera.position.set(0, 1.2, 4);
+        this.camera.lookAt(0, 1, 0);
+
+        // Lights
+        const ambient = new THREE.AmbientLight(0xffffff, 0.8);
+        this.scene.add(ambient);
+        const dir = new THREE.DirectionalLight(0xffffff, 0.8);
+        dir.position.set(2, 3, 2);
+        this.scene.add(dir);
+        const fill = new THREE.DirectionalLight(0xffffff, 0.4);
+        fill.position.set(-2, 2, -1);
+        this.scene.add(fill);
+
+        // Load previews sequentially
+        this.loadPreviewsSequentially();
     }
 
-    createPreview(charId) {
-        const container = document.getElementById(`preview-${charId}`);
-        if (!container) {
-            console.log(`No container found for preview-${charId}`);
-            return;
+    async loadPreviewsSequentially() {
+        const charIds = Object.keys(CHARACTER_MODELS);
+
+        for (const charId of charIds) {
+            const container = document.getElementById(`preview-${charId}`);
+            if (!container) continue;
+
+            console.log(`[Preview] Loading ${charId}...`);
+
+            try {
+                await this.loadAndRenderPreview(charId, container);
+                console.log(`[Preview] ${charId} done`);
+            } catch (err) {
+                console.error(`[Preview] ${charId} failed:`, err);
+            }
+
+            // Small delay between loads to let browser breathe
+            await new Promise(r => setTimeout(r, 100));
         }
 
-        // Create canvas
-        const canvas = document.createElement('canvas');
-        canvas.width = 160;  // 2x for retina
-        canvas.height = 160;
-        container.appendChild(canvas);
-
-        // Create scene
-        const scene = new THREE.Scene();
-
-        // Create camera - wider FOV and positioned to see full running character
-        const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 100);
-        camera.position.set(0, 1.2, 4);
-        camera.lookAt(0, 1, 0);
-
-        // Add lights
-        const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
-        scene.add(ambientLight);
-
-        const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        directionalLight.position.set(2, 3, 2);
-        scene.add(directionalLight);
-
-        // Add fill light from opposite side
-        const fillLight = new THREE.DirectionalLight(0xffffff, 0.4);
-        fillLight.position.set(-2, 2, -1);
-        scene.add(fillLight);
-
-        // Store preview data
-        const previewData = {
-            scene,
-            camera,
-            canvas,
-            mixer: null,
-            model: null,
-            loaded: false
-        };
-        this.previews.set(charId, previewData);
-
-        // Load the model
-        this.loadModel(charId, previewData);
+        // Clean up renderer after all previews done
+        this.dispose();
     }
 
-    loadModel(charId, previewData) {
-        const modelInfo = CHARACTER_MODELS[charId];
-        if (!modelInfo || !modelInfo.path) return;
+    loadAndRenderPreview(charId, container) {
+        return new Promise((resolve, reject) => {
+            const modelInfo = CHARACTER_MODELS[charId];
+            if (!modelInfo || !modelInfo.path) {
+                reject(new Error('No model path'));
+                return;
+            }
 
-        console.log(`[Preview] Loading ${charId} from ${modelInfo.path}`);
+            const loader = new FBXLoader();
+            loader.load(
+                modelInfo.path,
+                (fbx) => {
+                    // Clear previous model
+                    this.clearModel();
 
-        const loader = new FBXLoader();
-        loader.load(
-            modelInfo.path,
-            (fbx) => {
-                console.log(`[Preview] ${charId} loaded successfully`);
+                    // Scale
+                    const scale = (MODEL_SCALE_OVERRIDES[charId] || 0.01) * 1.2;
+                    fbx.scale.setScalar(scale);
 
-                // Scale the model (use character-specific scale or default)
-                // Preview default is 0.012, game default is 0.01, so multiply by 1.2
-                const baseScale = MODEL_SCALE_OVERRIDES[charId] || 0.01;
-                const previewScale = baseScale * 1.2;
-                fbx.scale.setScalar(previewScale);
+                    // Center and ground
+                    const box = new THREE.Box3().setFromObject(fbx);
+                    const center = box.getCenter(new THREE.Vector3());
+                    const size = box.getSize(new THREE.Vector3());
 
-                // Center the model
-                const box = new THREE.Box3().setFromObject(fbx);
-                const center = box.getCenter(new THREE.Vector3());
-                const size = box.getSize(new THREE.Vector3());
-                console.log(`[Preview] ${charId} size: ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}`);
+                    console.log(`[Preview] ${charId} size: ${size.x.toFixed(2)} x ${size.y.toFixed(2)} x ${size.z.toFixed(2)}`);
 
-                fbx.position.x = -center.x;
-                fbx.position.z = -center.z;
-                fbx.position.y = -box.min.y; // Ground the model (box is already in world space)
+                    fbx.position.x = -center.x;
+                    fbx.position.z = -center.z;
+                    fbx.position.y = -box.min.y;
 
-                // Apply rotation offset if needed
-                const rotationOffset = MODEL_ROTATION_OFFSETS[charId] || 0;
-                fbx.rotation.y = rotationOffset;
+                    // Rotation
+                    fbx.rotation.y = MODEL_ROTATION_OFFSETS[charId] || 0;
 
-                // Fix materials that might be invisible due to missing textures
-                fbx.traverse((child) => {
-                    if (child.isMesh) {
-                        const materials = Array.isArray(child.material) ? child.material : [child.material];
-                        materials.forEach(mat => {
-                            if (mat) {
-                                // If material has no map or map failed to load, ensure it's still visible
-                                if (!mat.map || mat.map.image === undefined) {
-                                    mat.color = mat.color || new THREE.Color(0x888888);
+                    // Fix materials
+                    fbx.traverse((child) => {
+                        if (child.isMesh) {
+                            const mats = Array.isArray(child.material) ? child.material : [child.material];
+                            mats.forEach(mat => {
+                                if (mat) {
+                                    if (!mat.map || !mat.map.image) {
+                                        mat.color = mat.color || new THREE.Color(0x888888);
+                                    }
+                                    mat.transparent = false;
+                                    mat.opacity = 1;
+                                    mat.side = THREE.DoubleSide;
+                                    mat.needsUpdate = true;
                                 }
-                                // Ensure material is not transparent
-                                mat.transparent = false;
-                                mat.opacity = 1;
-                                mat.side = THREE.DoubleSide;
-                                mat.needsUpdate = true;
-                            }
-                        });
+                            });
+                        }
+                    });
+
+                    // Play animation for one frame
+                    if (fbx.animations.length > 0) {
+                        this.mixer = new THREE.AnimationMixer(fbx);
+                        const action = this.mixer.clipAction(fbx.animations[0]);
+                        action.play();
+                        this.mixer.update(0.5); // Advance to a good pose
                     }
-                });
 
-                // Setup animation
-                if (fbx.animations.length > 0) {
-                    previewData.mixer = new THREE.AnimationMixer(fbx);
-                    const action = previewData.mixer.clipAction(fbx.animations[0]);
-                    action.play();
+                    this.scene.add(fbx);
+                    this.currentModel = fbx;
+
+                    // Render to canvas
+                    this.renderer.render(this.scene, this.camera);
+
+                    // Create static canvas and copy rendered image
+                    const canvas = document.createElement('canvas');
+                    canvas.width = 160;
+                    canvas.height = 160;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(this.renderer.domElement, 0, 0);
+
+                    // Add to container
+                    container.innerHTML = '';
+                    canvas.style.width = '100%';
+                    canvas.style.height = '100%';
+                    canvas.style.borderRadius = '8px';
+                    container.appendChild(canvas);
+
+                    // Clear model from memory
+                    this.clearModel();
+
+                    resolve();
+                },
+                undefined,
+                (error) => {
+                    console.error(`[Preview] Error loading ${charId}:`, error);
+                    reject(error);
                 }
-
-                previewData.scene.add(fbx);
-                previewData.model = fbx;
-                previewData.loaded = true;
-            },
-            undefined,
-            (error) => {
-                console.error(`Error loading ${charId} model:`, error);
-            }
-        );
-    }
-
-    startAnimation() {
-        if (this.isAnimating) return;
-        this.isAnimating = true;
-        this.animate();
-    }
-
-    stopAnimation() {
-        this.isAnimating = false;
-    }
-
-    animate() {
-        if (!this.isAnimating) return;
-        requestAnimationFrame(() => this.animate());
-
-        const delta = this.clock.getDelta();
-
-        // Update all previews
-        this.previews.forEach((previewData, charId) => {
-            if (!previewData.loaded) return;
-
-            // Update animation
-            if (previewData.mixer) {
-                previewData.mixer.update(delta);
-            }
-
-            // Slowly rotate the model for visual interest
-            if (previewData.model) {
-                const baseRotation = MODEL_ROTATION_OFFSETS[charId] || 0;
-                previewData.model.rotation.y = baseRotation + Math.sin(Date.now() * 0.001) * 0.3;
-            }
-
-            // Render to canvas
-            this.renderer.setSize(previewData.canvas.width, previewData.canvas.height);
-            this.renderer.render(previewData.scene, previewData.camera);
-
-            // Copy to preview canvas
-            const ctx = previewData.canvas.getContext('2d');
-            ctx.clearRect(0, 0, previewData.canvas.width, previewData.canvas.height);
-            ctx.drawImage(this.renderer.domElement, 0, 0);
+            );
         });
+    }
+
+    clearModel() {
+        if (this.currentModel) {
+            this.scene.remove(this.currentModel);
+            this.currentModel.traverse((child) => {
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) {
+                    const mats = Array.isArray(child.material) ? child.material : [child.material];
+                    mats.forEach(m => {
+                        if (m.map) m.map.dispose();
+                        m.dispose();
+                    });
+                }
+            });
+            this.currentModel = null;
+        }
+        if (this.mixer) {
+            this.mixer = null;
+        }
     }
 
     dispose() {
-        this.stopAnimation();
-        this.previews.forEach((previewData) => {
-            if (previewData.model) {
-                previewData.scene.remove(previewData.model);
-                previewData.model.traverse((child) => {
-                    if (child.geometry) child.geometry.dispose();
-                    if (child.material) {
-                        if (Array.isArray(child.material)) {
-                            child.material.forEach(m => m.dispose());
-                        } else {
-                            child.material.dispose();
-                        }
-                    }
-                });
-            }
-        });
-        this.previews.clear();
+        this.clearModel();
         if (this.renderer) {
             this.renderer.dispose();
+            this.renderer = null;
         }
-        this.initialized = false;
+        this.scene = null;
+        this.camera = null;
+        console.log('[Preview] Disposed all resources');
     }
 }
 
-// Create singleton instance
+// Singleton
 const characterPreviewManager = new CharacterPreviewManager();
 
-// Export for module use
 export { characterPreviewManager };
 
-// Also expose on window for inline script access
 window.initCharacterPreviews = () => characterPreviewManager.init();
 window.disposeCharacterPreviews = () => characterPreviewManager.dispose();
