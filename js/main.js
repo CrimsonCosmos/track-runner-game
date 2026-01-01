@@ -1112,7 +1112,7 @@ function setupNetworkSync() {
 const REMOTE_CHARACTER_MODELS = {
     trump: 'public/characters/trump/source/Running.fbx',
     musk: 'public/characters/musk.fbx',
-    stalin: 'public/characters/stalin.fbx',
+    stalin: 'public/characters/stalin/source/model.fbx',
     skeleton: 'public/characters/skeleton.fbx',
     snowman: 'public/characters/snowman.fbx',
     demon: 'public/characters/demon.fbx'

@@ -7,7 +7,7 @@ import { FBXLoader } from 'three/addons/loaders/FBXLoader.js';
 const CHARACTER_MODELS = {
     trump: { path: 'public/characters/trump/source/Running.fbx', name: 'Trump' },
     musk: { path: 'public/characters/musk.fbx', name: 'Musk' },
-    stalin: { path: 'public/characters/stalin.fbx', name: 'Stalin' },
+    stalin: { path: 'public/characters/stalin/source/model.fbx', name: 'Stalin' },
     skeleton: { path: 'public/characters/skeleton.fbx', name: 'Skeleton' },
     snowman: { path: 'public/characters/snowman.fbx', name: 'Snowman' },
     demon: { path: 'public/characters/demon.fbx', name: 'Demon' },
