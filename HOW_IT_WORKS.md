@@ -695,7 +695,7 @@ Here's what happens every frame (~16ms at 60 FPS):
 
 ### Development
 ```bash
-cd /Users/dylangehl/track-runner-game
+cd track-runner-game
 npm install
 npm run dev
 # Opens at http://localhost:5173

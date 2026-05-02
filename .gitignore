@@ -25,3 +25,10 @@ npm-debug.log*
 
 # Tauri build output
 src-tauri/target/
+
+# Duplicate model source (served from public/models/)
+/models/
+
+# AI assistant files
+CLAUDE.md
+.claude/
